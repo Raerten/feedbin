@@ -19,7 +19,7 @@ class Download
 
   def download
     File.open(file_path, "wb") do |f|
-      @response = HTTP.timeout(write: 5, connect: 5, read: 20).follow(max_hops: 5).get(url)
+      @response = HTTP.timeout(write: 30, connect: 30, read: 60).follow(max_hops: 5).get(url)
       @response.body.each { |chunk| f.write(chunk) }
     end
     file_path
