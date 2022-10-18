@@ -1,13 +1,19 @@
 class FeedImporter
   include Sidekiq::Worker
-  sidekiq_options queue: :critical, retry: false
+  sidekiq_options queue: :default_critical, retry: false
 
   def perform(import_item_id)
     import_item = ImportItem.find(import_item_id)
     import = import_item.import
     user = import.user
 
-    feeds = find_feeds(import_item, user)
+    feeds = begin
+      FeedFinder.feeds(import_item.details[:xml_url], import_mode: true, twitter_auth: user.twitter_auth)
+    rescue => exception
+      import_item.update(status: :failed, error_class: exception.class.name, error_message: exception.message)
+      []
+    end
+
     if feeds.present?
       feed = feeds.first
       user.subscriptions.create_with(title: import_item.details[:title]).find_or_create_by(feed: feed)
@@ -25,7 +31,7 @@ class FeedImporter
   end
 
   def find_feeds(import_item, user)
-    FeedFinder.feeds(import_item.details[:xml_url], import_mode: true, twitter_auth: user.twitter_auth)
+
   rescue => e
     if Rails.env.development?
       raise e

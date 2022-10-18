@@ -13,7 +13,7 @@ class WebSubController < ApplicationController
       render plain: params["hub.challenge"]
     elsif "denied" == params["hub.mode"] && valid_topic
       @feed.update(push_expiration: Time.now + 1.week)
-      Honeybadger.notify(error_class: "WebSubController#denied", error_message: "Request denied", parameters: params)
+      ErrorService.notify(error_class: "WebSubController#denied", error_message: "Request denied", parameters: params)
       head :ok
     else
       head :not_found
@@ -35,9 +35,9 @@ class WebSubController < ApplicationController
         video_ids = entries.map {|entry| entry.dig(:data, :youtube_video_id) }.compact
         if video_ids.present?
           HarvestEmbeds.new.add_missing_to_queue(video_ids)
-          YoutubeReceiver.perform_in(2.minutes, data)
+          FeedCrawler::YoutubeReceiver.perform_in(2.minutes, data)
         else
-          FeedRefresherReceiver.new.perform(data)
+          FeedCrawler::Receiver.new.perform(data)
         end
         Librato.increment "entry.push"
       end

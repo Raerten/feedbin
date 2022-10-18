@@ -78,6 +78,7 @@ class ApplicationController < ActionController::Base
       font_stylesheet: ENV["FONT_STYLESHEET"],
       modal_extracts_path: modal_extracts_path,
       progress: @user.recently_played_entries_progress,
+      progress_path: progress_recently_played_entries_path,
       subscription_view_mode: subscription_view_settings,
       pages_internal_path: pages_internal_path,
       tag_visibility: @user.tag_visibility,
@@ -234,28 +235,31 @@ class ApplicationController < ActionController::Base
   def feeds_response
     view_mode = params[:view] || params[:view_mode]
     if view_mode == "view_all"
-      entry_id_cache = EntryIdCache.new(@user.id, @feed_ids)
-      @entries = entry_id_cache.page(params[:page])
-      @page_query = @entries
+      @page_query = Entry.where(feed: @feed_ids).order(published: :desc).page(params[:page])
+      @entries = Entry.entries_with_feed(@page_query.pluck(:id), "DESC").entries_list
     elsif view_mode == "view_starred"
-      starred_entries = @user.starred_entries.select(:entry_id).where(feed_id: @feed_ids).page(params[:page]).order("published DESC")
-      @entries = Entry.entries_with_feed(starred_entries, "DESC").entries_list
-      @page_query = starred_entries
+      @page_query = @user.starred_entries.select(:entry_id).where(feed_id: @feed_ids).page(params[:page]).order("published DESC")
+      @entries = Entry.entries_with_feed(@page_query.pluck(:entry_id), "DESC").entries_list
     else
       @all_unread = "true"
-      unread_entries = @user.unread_entries.select(:entry_id).where(feed_id: @feed_ids).page(params[:page]).sort_preference(@user.entry_sort)
-      @entries = Entry.entries_with_feed(unread_entries, @user.entry_sort).entries_list
-      @page_query = unread_entries
+      @page_query = @user.unread_entries.select(:entry_id).where(feed_id: @feed_ids).page(params[:page]).sort_preference(@user.entry_sort)
+      @entries = Entry.entries_with_feed(@page_query.pluck(:entry_id), @user.entry_sort).entries_list
     end
+    @append = params[:page].present?
   end
 
   def honeybadger_context
-    Honeybadger.context(user_id: current_user.id) if current_user
+    ErrorService.context(user_id: current_user.id) if current_user
   end
 
   def verify_push_token(authentication_token)
     authentication_token = CGI.unescape(authentication_token)
     verifier = ActiveSupport::MessageVerifier.new(Rails.application.secrets.secret_key_base)
     verifier.verify(authentication_token)
+  end
+
+  def rate_limited?(count, period)
+    slug = ["limit", request.method, params[:controller], params[:action], current_user.id]
+    !Throttle.throttle!(slug.join(":"), count, period)
   end
 end

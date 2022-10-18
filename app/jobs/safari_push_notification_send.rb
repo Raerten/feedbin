@@ -1,11 +1,11 @@
 class SafariPushNotificationSend
   include Sidekiq::Worker
-  sidekiq_options retry: false, queue: :critical
+  sidekiq_options retry: false, queue: :default_critical
 
   VERIFIER = ActiveSupport::MessageVerifier.new(Rails.application.secrets.secret_key_base)
 
-  APNOTIC_POOL = Apnotic::ConnectionPool.new({cert_path: ENV["APPLE_PUSH_CERT"]}, size: 5) { |connection|
-    connection.on(:error) { |exception| Honeybadger.notify(exception) }
+  APNOTIC_POOL = Apnotic::ConnectionPool.new({cert_path: ENV["APPLE_PUSH_CERT"], cert_pass: ENV["APPLE_PUSH_CERT_PASSWORD"]}, size: 5) { |connection|
+    connection.on(:error) { |exception| ErrorService.notify(exception) }
   }
 
   def perform(user_ids, entry_id)

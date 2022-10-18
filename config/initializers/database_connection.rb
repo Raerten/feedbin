@@ -15,12 +15,19 @@ if Rails.env.production?
       ActiveRecord::Base.establish_connection(
         adapter: "postgresql",
         host: uri.host,
-        port: uri.port,
+        port: ENV["DB_PORT"]&.to_i || uri.port,
         username: uri.user,
         password: uri.password,
         database: database,
         reaping_frequency: ENV["DB_REAP_FREQ"] || 10,
-        pool: ENV["DB_POOL"] || Etc.nprocessors
+        pool: ENV["DB_POOL"] || Etc.nprocessors,
+        connect_timeout: 5,
+        prepared_statements: ENV["PG_BOUNCER"]&.to_i == 1 ? false : true,
+        advisory_locks: ENV["PG_BOUNCER"]&.to_i == 1 ? false : true,
+        variables: {
+          statement_timeout: ENV["DB_STATEMENT_TIMEOUT"] || "15s",
+          lock_timeout: ENV["DB_LOCK_TIMEOUT"] || "10s"
+        }
       )
     end
   end

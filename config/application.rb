@@ -2,7 +2,6 @@ require_relative "boot"
 
 require "rails/all"
 require_relative "../lib/basic_authentication"
-require_relative "../lib/tld_length"
 
 # Require the gems listed in Gemfile, including any gems
 # you've limited to :test, :development, or :production.
@@ -24,11 +23,7 @@ module Feedbin
 
     config.middleware.use Rack::ContentLength
 
-    config.middleware.use Rack::Attack
-
     config.middleware.use BasicAuthentication
-
-    config.middleware.use TldLength
 
     config.exceptions_app = routes
 
@@ -39,5 +34,6 @@ module Feedbin
     config.action_view.automatically_disable_submit_tag = false
     config.active_record.belongs_to_required_by_default = false
     config.action_view.default_enforce_utf8 = true
+    config.active_record.yaml_column_permitted_classes = [Symbol]
   end
 end

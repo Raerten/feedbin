@@ -2,9 +2,9 @@ class PodcastPushNotification
   include Sidekiq::Worker
 
   def perform(user_id, entry_id)
-    Honeybadger.context(user_id: user_id, entry_id: entry_id)
+    ErrorService.context(user_id: user_id, entry_id: entry_id)
     entry = Entry.find(entry_id)
-    tokens = Device.where(user_id: user_id).podcast.pluck(:token)
+    tokens = Device.where(user_id: user_id, active: true).podcast.pluck(:token)
     tokens.each do |token|
       notification = build_notification(token, entry)
 

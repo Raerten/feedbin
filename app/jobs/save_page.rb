@@ -1,6 +1,6 @@
 class SavePage
   include Sidekiq::Worker
-  sidekiq_options queue: :critical
+  sidekiq_options queue: :default_critical
 
   attr_reader :user, :url, :title
 
@@ -10,7 +10,7 @@ class SavePage
     @title = title
     entry = create_webpage_entry
     ImageSaver.perform_async(entry.id)
-    FaviconFetcher.perform_async(host, true)
+    FaviconCrawler::Finder.perform_async(host, true)
     entry
   end
 

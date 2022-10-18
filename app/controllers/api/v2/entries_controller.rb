@@ -1,8 +1,6 @@
 module Api
   module V2
     class EntriesController < ApiController
-      include RedisCache
-
       respond_to :json
       before_action :correct_user, only: [:show]
       before_action :limit_ids, only: [:index]
@@ -14,22 +12,12 @@ module Api
           allowed_feed_ids = []
           allowed_feed_ids = allowed_feed_ids.concat(@user.starred_entries.select("DISTINCT feed_id").map { |entry| entry.feed_id })
           allowed_feed_ids = allowed_feed_ids.concat(@user.subscriptions.pluck(:feed_id))
-          @entries = Entry.where(id: @ids, feed_id: allowed_feed_ids).page(nil).includes(:feed)
-          entries_response "api_v2_entries_url"
-        elsif params.key?(:starred) && params[:starred] == "true"
-          page = if params[:page]
-            params[:page].to_i
-          else
-            1
-          end
-          @starred_entries = @user.starred_entries.select(:entry_id).order("created_at DESC").page(page)
-          if params.key?(:per_page)
-            @starred_entries = @starred_entries.per_page(params[:per_page].to_i)
-          end
-          @entries = Entry.where(id: @starred_entries.map { |starred_entry| starred_entry.entry_id }).includes(:feed)
+          @page_query = Entry.where(id: @ids, feed_id: allowed_feed_ids).page(nil).includes(:feed)
           entries_response "api_v2_entries_url"
         else
-          sorted_set_response
+          @feed_ids = @user.subscriptions.pluck(:feed_id)
+          @page_query = Entry.where(feed_id: @feed_ids).order(created_at: :desc).page(params[:page])
+          entries_response "api_v2_entries_url"
         end
       end
 
@@ -74,33 +62,6 @@ module Api
           status_not_found
         elsif !@user.subscribed_to?(@entry.feed.id)
           status_forbidden
-        end
-      end
-
-      def sorted_set_response
-        begin
-          since = Time.parse(params[:since])
-          since = "(%10.6f" % since.to_f
-        rescue TypeError
-          since = "-inf"
-        end
-
-        cache_key = [since, params[:starred], params[:read]]
-        cache_key = Digest::SHA1.hexdigest(cache_key.join(":"))
-        cache_key = "user:#{@user.id}:sorted_entry_ids:#{cache_key}"
-
-        entry_ids = get_cached_entry_ids(cache_key, FeedbinUtils::FEED_ENTRIES_CREATED_AT_KEY, since, params[:read], params[:starred])
-        pagination = build_pagination(entry_ids)
-        entry_count(pagination[:will_paginate])
-
-        if entry_ids.blank?
-          render json: []
-        elsif pagination[:page] <= 0 || pagination[:paged_entry_ids][pagination[:page_index]].nil?
-          status_not_found
-        else
-          @entries = Entry.where(id: pagination[:paged_entry_ids][pagination[:page_index]]).includes(:feed).order(created_at: :desc)
-          links_header(pagination[:will_paginate], "api_v2_entries_url")
-          render_json "entries/index"
         end
       end
     end

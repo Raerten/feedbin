@@ -15,12 +15,10 @@ class Entry < ApplicationRecord
   before_create :update_content
   before_create :tweet_metadata
   before_update :create_summary
-  after_commit :cache_public_id, on: :create
-  after_commit :find_images, on: :create
+  after_commit :cache_public_id, on: [:create, :update]
+  after_commit :find_images, on: :create, unless: :skip_images?
   after_commit :mark_as_unread, on: :create
   after_commit :mark_as_unplayed, on: :create
-  after_commit :add_to_created_at_set, on: :create
-  after_commit :add_to_published_set, on: :create
   after_commit :increment_feed_stat, on: :create
   after_commit :touch_feed_last_published_entry, on: :create
   after_commit :harvest_links, on: :create
@@ -203,38 +201,11 @@ class Entry < ApplicationRecord
   end
 
   def self.entries_with_feed(entry_ids, sort)
-    entry_ids = entry_ids.map(&:entry_id)
-    entries = Entry.where(id: entry_ids).includes(feed: [:favicon])
-    entries = if sort == "ASC"
-      entries.order("published ASC")
-    else
-      entries.order("published DESC")
-    end
-    entries
+    Entry.where(id: entry_ids).order_by_ids(entry_ids).includes(feed: [:favicon])
   end
 
   def self.entries_list
     select(:id, :feed_id, :title, :summary, :published, :image, :data, :author, :url, :updated_at, :settings)
-  end
-
-  def self.include_unread_entries(user_id)
-    joins("LEFT OUTER JOIN unreads ON entries.id = unreads.entry_id AND unreads.user_id = #{user_id.to_i}")
-  end
-
-  def self.unread_new
-    where("unreads.entry_id IS NOT NULL")
-  end
-
-  def self.read_new
-    where("unreads.entry_id IS NULL")
-  end
-
-  def self.include_starred_entries(user_id)
-    joins("LEFT OUTER JOIN starred_entries ON entries.id = starred_entries.entry_id AND starred_entries.user_id = #{user_id.to_i}")
-  end
-
-  def self.unstarred_new
-    where("starred_entries.entry_id IS NULL")
   end
 
   def self.sort_preference(sort)
@@ -290,6 +261,12 @@ class Entry < ApplicationRecord
     end
   end
 
+  def placeholder_color
+    if image && image["placeholder_color"].respond_to?(:length) && image["placeholder_color"].length == 6
+      image["placeholder_color"]
+    end
+  end
+
   def processed_image?
     processed_image ? true : false
   end
@@ -317,6 +294,12 @@ class Entry < ApplicationRecord
       url.host = host if host
       url.scheme = "https"
       url.to_s
+    end
+  end
+
+  def tweet_link_image_placeholder_color
+    if data && data["twitter_link_image_placeholder_color"].respond_to?(:length) && data["twitter_link_image_placeholder_color"].length == 6
+      data["twitter_link_image_placeholder_color"]
     end
   end
 
@@ -380,6 +363,28 @@ class Entry < ApplicationRecord
     published > 7.days.ago
   end
 
+  def audio_duration
+    seconds = 0
+    duration = data && data["itunes_duration"]
+
+    return seconds if duration.nil?
+
+    parts = duration.to_s.split(":").map(&:to_i).compact
+    parts.first(3).reverse.each_with_index do |item, index|
+      seconds += item * 60 ** index
+    end
+    seconds
+  end
+
+  def self.order_by_ids(ids)
+    table = Entry.arel_table
+    condition = Arel::Nodes::Case.new(table[:id])
+    ids.each_with_index do |id, index|
+      condition.when(id).then(index)
+    end
+    order(condition)
+  end
+
   private
 
   def base_url
@@ -430,14 +435,14 @@ class Entry < ApplicationRecord
       }
       UnreadEntry.import(unread_entries, validate: false, on_duplicate_key_ignore: true)
     end
-    SearchIndexStore.perform_async(self.class.name, id)
+    Search::SearchIndexStore.perform_async(self.class.name, id)
   end
 
   def mark_as_unplayed
     if skip_mark_as_unread.blank? && recent_post
       user_ids = PodcastSubscription.subscribed.where(feed_id: feed_id).pluck(:user_id)
       entries = user_ids.map do |user_id|
-        QueuedEntry.new(user_id: user_id, feed_id: feed_id, entry_id: id, order: Time.now.to_i, progress: 0)
+        QueuedEntry.new(user_id: user_id, feed_id: feed_id, entry_id: id, order: Time.now.to_i, progress: 0, duration: audio_duration)
       end
       QueuedEntry.import(entries, validate: false, on_duplicate_key_ignore: true)
       increment!(:queued_entries_count, entries.count)
@@ -449,22 +454,6 @@ class Entry < ApplicationRecord
 
   def recent_post
     skip_recent_post_check || published > 1.month.ago
-  end
-
-  def add_to_created_at_set
-    score = "%10.6f" % created_at.to_f
-    key = FeedbinUtils.redis_created_at_key(feed_id)
-    $redis[:entries].with do |redis|
-      redis.zadd(key, score, id)
-    end
-  end
-
-  def add_to_published_set
-    score = "%10.6f" % published.to_f
-    key = FeedbinUtils.redis_published_key(feed_id)
-    $redis[:entries].with do |redis|
-      redis.zadd(key, score, id)
-    end
   end
 
   def increment_feed_stat
@@ -495,9 +484,9 @@ class Entry < ApplicationRecord
   end
 
   def find_images
-    EntryImage.perform_async(public_id)
+    ImageCrawler::EntryImage.perform_async(public_id)
     if data && data["itunes_image"]
-      ItunesImage.perform_async(public_id)
+      ImageCrawler::ItunesImage.perform_async(public_id)
     end
   end
 
@@ -521,5 +510,11 @@ class Entry < ApplicationRecord
 
   def save_twitter_users
     SaveTwitterUsers.perform_async(id) if tweet?
+  end
+
+  def skip_images?
+    if ENV["SKIP_IMAGES"].present?
+      Rails.logger.info("SKIP_IMAGES is present, no images will be processed")
+    end
   end
 end

@@ -1,6 +1,6 @@
 class FeedUpdate
   include Sidekiq::Worker
-  sidekiq_options queue: :worker_slow
+  sidekiq_options queue: :utility
 
   def perform(feed_id)
     feed = Feed.find(feed_id)
@@ -21,8 +21,6 @@ class FeedUpdate
     end
 
     Entry.import!(entries, on_duplicate_key_update: {conflict_target: :public_id, columns: [:title, :url, :author, :content, :data]})
-
-    RedisServerSetup.new.perform(feed_id)
   rescue Feedkit::NotFeed
   end
 end

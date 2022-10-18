@@ -286,7 +286,7 @@ class User < ApplicationRecord
     token = generate_token(:password_reset_token, nil, true)
     self.password_reset_sent_at = Time.now
     save!
-    UserMailer.delay(queue: :critical).password_reset(id, token)
+    UserMailer.delay(queue: :default_critical).password_reset(id, token)
   end
 
   def create_customer
@@ -316,7 +316,7 @@ class User < ApplicationRecord
 
     self.stripe_token = nil
   rescue Stripe::StripeError => exception
-    Honeybadger.notify(exception)
+    ErrorService.notify(exception)
     errors.add :base, exception.message.to_s
     self.stripe_token = nil
     throw(:abort)
@@ -428,7 +428,7 @@ class User < ApplicationRecord
   end
 
   def create_deleted_user
-    DeletedUser.create(email: email, customer_id: customer_id)
+    DeletedUser.create(email: email, customer_id: customer_id, original_user_id: id)
   end
 
   def record_stats

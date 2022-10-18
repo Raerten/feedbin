@@ -171,10 +171,13 @@ Rails.application.routes.draw do
         patch :newsletter_senders
       end
     end
+
+    resources :imports, only: [:create, :show]
+    get :import_export, to: "imports#index"
+
     get :account
     get :billing
     get :payment_details
-    get :import_export
     get :appearance
     get :newsletters_pages
     post :update_credit_card
@@ -217,6 +220,7 @@ Rails.application.routes.draw do
   resources :recently_played_entries, only: [] do
     collection do
       delete :destroy_all
+      get :progress
     end
   end
 
@@ -259,6 +263,7 @@ Rails.application.routes.draw do
             resource :bulk, controller: :bulk, only: [:update]
           end
           resources :queued_entries, only: [:index, :create, :update, :destroy]
+          post :authentication, to: "authentication#index"
         end
       end
 

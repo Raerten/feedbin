@@ -19,6 +19,7 @@ class Feed < ApplicationRecord
 
   after_commit :web_sub_subscribe, on: :create
 
+  attribute :crawl_data, CrawlDataType.new
   attr_accessor :count, :tags
   attr_readonly :feed_url
 
@@ -131,15 +132,10 @@ class Feed < ApplicationRecord
   def priority_refresh(user = nil)
     if twitter_feed?
       if 10.minutes.ago > updated_at
-        TwitterFeedRefresher.new.enqueue_feed(self, user)
+        FeedCrawler::TwitterSchedule.new.enqueue_feed(self, user)
       end
     else
-      Sidekiq::Client.push_bulk(
-        "args" => [[id, feed_url, subscriptions_count]],
-        "class" => "FeedDownloaderCritical",
-        "queue" => "feed_downloader_critical",
-        "retry" => false
-      )
+      FeedCrawler::DownloaderCritical.perform_async(id, feed_url, subscriptions_count, crawl_data.to_h)
     end
   end
 
@@ -176,7 +172,7 @@ class Feed < ApplicationRecord
   end
 
   def web_sub_subscribe
-    WebSubSubscribe.perform_async(id)
+    WebSub::Subscribe.perform_async(id)
   end
 
   def hubs
@@ -229,8 +225,8 @@ class Feed < ApplicationRecord
   private
 
   def refresh_favicon
-    FaviconFetcher.perform_async(host)
-    ItunesFeedImage.perform_async(id)
+    FaviconCrawler::Finder.perform_async(host)
+    ImageCrawler::ItunesFeedImage.perform_async(id)
   end
 
   def default_values

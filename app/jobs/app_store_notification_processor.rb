@@ -1,16 +1,20 @@
 class AppStoreNotificationProcessor
   include Sidekiq::Worker
-  sidekiq_options queue: :critical
+  sidekiq_options queue: :default_critical
 
   PRODUCTS = {
     "yearly_v1"         => "app-subscription",
     "yearly_pro_v1"     => "app-subscription",
     "monthly_pro_v1"    => "app-subscription",
     "yearly_podcast_v1" => "podcast-subscription",
+    "yearly_podcast_v2" => "podcast-subscription",
+    "yearly_podcast_v3" => "podcast-subscription",
+    "yearly_podcast_v4" => "podcast-subscription",
   }
 
-  def perform(token)
+  def perform(token, user_id = nil)
     @token = token
+    @user = User.find_by_id(user_id)
     notification = user.app_store_notifications.create_with(
       notification_type: data.dig("notificationType"),
       subtype: data.dig("subtype"),

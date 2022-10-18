@@ -1,7 +1,7 @@
 class FeedStatus
   include Sidekiq::Worker
-  include BatchJobs
-  sidekiq_options queue: :worker_slow
+  include SidekiqHelper
+  sidekiq_options queue: :utility
 
   def perform(feed_id = nil, schedule = false)
     if schedule

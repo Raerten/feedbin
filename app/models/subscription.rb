@@ -10,7 +10,6 @@ class Subscription < ApplicationRecord
 
   after_create :add_feed_to_action
   after_commit :remove_feed_from_action, on: [:destroy]
-  after_commit :cache_entry_ids, on: [:create, :destroy]
 
   before_destroy :prevent_generated_destroy
   before_destroy :mark_as_read
@@ -60,11 +59,11 @@ class Subscription < ApplicationRecord
   end
 
   def add_feed_to_action
-    AddFeedToAction.perform_async(user_id)
+    Search::AddFeedToAction.perform_async(user_id)
   end
 
   def remove_feed_from_action
-    RemoveFeedFromAction.perform_async(user_id, feed_id)
+    Search::RemoveFeedFromAction.perform_async(user_id, feed_id)
   end
 
   def expire_stat_cache
@@ -96,11 +95,7 @@ class Subscription < ApplicationRecord
   private
 
   def refresh_favicon
-    FaviconFetcher.perform_async(feed.host)
-    ItunesFeedImage.perform_async(feed_id)
-  end
-
-  def cache_entry_ids
-    RedisServerSetup.new.perform(feed_id)
+    FaviconCrawler::Finder.perform_async(feed.host)
+    ImageCrawler::ItunesFeedImage.perform_async(feed_id)
   end
 end

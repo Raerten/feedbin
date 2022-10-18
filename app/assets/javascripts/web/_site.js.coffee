@@ -84,8 +84,9 @@ $.extend feedbin,
       feedbin.hideLinkAction(url)
 
   changeContentView: (view) ->
-    currentView = $('[data-behavior~=content_option]:not(.hide)')
-    nextView = $("[data-behavior~=content_option][data-content-option=#{view}]")
+    id = feedbin.selectedEntry.id
+    currentView = $("[data-entry-id=#{id}] [data-behavior~=content_option]:not(.hide)")
+    nextView = $("[data-entry-id=#{id}] [data-behavior~=content_option][data-content-option=#{view}]")
 
     if view == 'extract'
       $('body').addClass('extract-active')
@@ -309,6 +310,12 @@ $.extend feedbin,
   setThemeColor: ->
     color = feedbin.colorForSection("body")
     $('meta[name=theme-color]').attr("content", color)
+    if feedbin.darkMode()
+      $('body').removeClass("prefers-light")
+      $('body').addClass("prefers-dark")
+    else
+      $('body').removeClass("prefers-dark")
+      $('body').addClass("prefers-light")
 
   colorForSection: (section, overlay = false) ->
     color = $("[data-theme-#{section}]").css("backgroundColor")
@@ -697,13 +704,18 @@ $.extend feedbin,
   isRead: (entryId) ->
     feedbin.Counts.get().isRead(entryId)
 
+  imageLoaded: (element) ->
+    $(element).closest(".entry-image").addClass("loaded")
+
+  imageError: (element) ->
+    $(element).closest(".entry-image").css
+      display: "none"
+
   imagePlaceholders: (element) ->
     image = new Image()
     placehold = element.children[0]
-    element.className += ' is-loading'
 
     image.onload = ->
-      element.className = element.className.replace('is-loading', 'is-loaded')
       element.replaceChild(image, placehold)
 
     image.onerror = ->
@@ -978,7 +990,7 @@ $.extend feedbin,
       feedbin.removeOuterLinks()
       feedbin.formatIframes($("[data-iframe-src]").not("[data-behavior~=iframe_placeholder]"))
       feedbin.playState()
-      feedbin.timeRemaining(entryId)
+      feedbin.timeRemaining(entryId, true)
       feedbin.syntaxHighlight()
       feedbin.footnotes()
       feedbin.nextEntryPreview()
@@ -1301,7 +1313,7 @@ $.extend feedbin,
     $('> [data-behavior~=sort_feed]', target).sort(feedbin.sortByFeedOrder).detach().appendTo(target)
 
   sortFeeds: ->
-      $('.drawer ul').each ->
+      $('[data-behavior~=feed_drawer] ul').each ->
         feedbin.sort $(@)
       feedbin.sort $('[data-behavior~=feeds_target]')
 
@@ -1452,6 +1464,25 @@ $.extend feedbin,
     feedbin.measureEntryColumn()
     feedbin.setNativeBorders()
 
+  baseFontSize: ->
+    element = document.createElement('div')
+    content = document.createTextNode('content')
+    element.appendChild content
+    element.style.display = 'none'
+    element.style.font = '-apple-system-body'
+
+    if element.style.font != "" && "ontouchend" of document
+      document.body.appendChild element
+      style = window.getComputedStyle(element, null)
+      size = style.getPropertyValue 'font-size'
+      base = parseInt(size) - 1
+      element.parentNode.removeChild(element)
+    else
+      base = "16"
+
+    $("html").css
+      "font-size": "#{base}px"
+
   embeds: {}
 
   entries: {}
@@ -1521,23 +1552,7 @@ $.extend feedbin,
       $(window).on('window:throttledResize', feedbin.panelCount);
 
     baseFontSize: ->
-      element = document.createElement('div')
-      content = document.createTextNode('content')
-      element.appendChild content
-      element.style.display = 'none'
-      element.style.font = '-apple-system-body'
-
-      if element.style.font != "" && "ontouchend" of document
-        document.body.appendChild element
-        style = window.getComputedStyle(element, null)
-        size = style.getPropertyValue 'font-size'
-        base = parseInt(size) - 1
-        element.parentNode.removeChild(element)
-      else
-        base = "16"
-
-      $("html").css
-        "font-size": "#{base}px"
+      feedbin.baseFontSize()
 
     faviconColors: ->
       feedbin.faviconColors($("body"))
@@ -1949,7 +1964,7 @@ $.extend feedbin,
         container.toggleClass('open')
         container.addClass('animate')
 
-        drawer = container.find('.drawer')
+        drawer = container.find('[data-behavior~=feed_drawer]')
 
         if open
           windowHeight = window.innerHeight
@@ -2798,8 +2813,10 @@ $.extend feedbin,
         $(@).tooltip('hide')
 
     colorSchemePreference: ->
+      feedbin.setThemeColor()
       darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
       darkModeMediaQuery.addListener (event) ->
+        console.log "called"
         feedbin.setThemeColor()
         setTimeout feedbin.setNativeTheme, 300
 

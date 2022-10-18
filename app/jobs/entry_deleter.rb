@@ -1,6 +1,6 @@
 class EntryDeleter
   include Sidekiq::Worker
-  sidekiq_options queue: :worker_slow
+  sidekiq_options queue: :utility
 
   def perform(feed_id)
     feed = Feed.find(feed_id)
@@ -8,7 +8,7 @@ class EntryDeleter
     entry_limit = if ENV["ENTRY_LIMIT"]
       ENV["ENTRY_LIMIT"].to_i
     else
-      feed.subscriptions_count == 0 ? 10 : 400
+      feed.subscriptions.where(active: true).exists? ? 400 : 10
     end
 
     feed.feed_stats.where("day < ?", 90.days.ago).delete_all
@@ -37,7 +37,7 @@ class EntryDeleter
     end
 
     if entry_ids.present?
-      SearchIndexRemove.perform_async(entry_ids)
+      Search::SearchIndexRemove.perform_async(entry_ids)
 
       UnreadEntry.where(entry_id: entry_ids).delete_all
       UpdatedEntry.where(entry_id: entry_ids).delete_all
@@ -45,12 +45,6 @@ class EntryDeleter
       StarredEntry.where(entry_id: entry_ids).delete_all
       Entry.where(id: entry_ids).delete_all
 
-      key_created_at = FeedbinUtils.redis_created_at_key(feed_id)
-      key_published = FeedbinUtils.redis_published_key(feed_id)
-      $redis[:entries].with do |redis|
-        redis.zrem(key_created_at, entry_ids)
-        redis.zrem(key_published, entry_ids)
-      end
       Librato.increment("entry.destroy", by: entry_ids.count)
     end
   end

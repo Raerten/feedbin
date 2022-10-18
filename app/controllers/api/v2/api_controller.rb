@@ -5,35 +5,37 @@ module Api
       before_action :valid_user, if: :signed_in?
 
       def entries_response(path_helper)
-        if params.key?(:read)
-          @entries = @entries.include_unread_entries(@user.id)
-
-          if params[:read] == "true"
-            @entries = @entries.read_new
-          elsif params[:read] == "false"
-            @entries = @entries.unread_new
-          end
+        if params[:read] == "true"
+          @page_query = @page_query.where.not(id: @user.unread_entries.select(:entry_id))
+        elsif params[:read] == "false"
+          @page_query = @page_query.where(id: @user.unread_entries.select(:entry_id))
         end
 
-        if params.key?(:starred) && params[:starred] == "false"
-          @entries = @entries.include_starred_entries(@user.id)
-          @entries = @entries.unstarred_new
+        if params[:starred] == "true"
+          @page_query = @page_query.where(id: @user.starred_entries.select(:entry_id))
+        elsif params[:starred] == "false"
+          @page_query = @page_query.where.not(id: @user.starred_entries.select(:entry_id))
         end
 
-        if params.key?(:since)
-          time = Time.iso8601(params[:since])
-          @entries = @entries.where("entries.created_at > :time", {time: time})
+        if time = Time.iso8601(params[:since]) rescue nil
+          @page_query = @page_query.where("entries.created_at > :time", time: time)
         end
 
-        page_query = @starred_entries || @entries
-        entry_count(page_query)
+        if params.key?(:per_page) && params[:per_page].respond_to?(:to_i)
+          @page_query = @page_query.per_page(params[:per_page].to_i)
+        end
 
-        if page_query.out_of_bounds?
+        ids = @page_query.pluck(:id)
+        @entries = Entry.where(id: ids).order_by_ids(ids).includes(:feed)
+
+        entry_count(@page_query)
+
+        if @page_query.out_of_bounds?
           status_not_found
         elsif !@entries.present?
           render json: []
         else
-          links_header(page_query, path_helper, params[:feed_id])
+          links_header(@page_query, path_helper, params[:feed_id])
           if stale?(etag: @entries)
             render_json "entries/index"
           end
@@ -54,11 +56,6 @@ module Api
         headers["X-Feedbin-Record-Count"] = count.to_s
       end
 
-      def rate_limited?(count, period)
-        slug = ["limit", request.method, params[:controller], params[:action], current_user.id]
-        !Throttle.throttle!(slug.join(":"), count, period)
-      end
-
       def status_too_many_requests
         @error = {status: 429, errors: []}
         render partial: "api/v2/shared/api_error", status: :too_many_requests
@@ -70,19 +67,19 @@ module Api
           @error[:errors] << {since: "invalid date format"}
         end
         render partial: "api/v2/shared/api_error", status: 400
-        Honeybadger.notify(exception)
+        ErrorService.notify(exception)
       end
 
       rescue_from ActiveRecord::RecordNotFound do |exception|
         @error = {status: 404, message: "Not Found", errors: []}
         render partial: "api/v2/shared/api_error", status: 404
-        Honeybadger.notify(exception)
+        ErrorService.notify(exception)
       end
 
       rescue_from MultiJson::DecodeError do |exception|
         @error = {status: 400, message: "Problem parsing JSON", errors: []}
         render partial: "api/v2/shared/api_error", status: 400
-        Honeybadger.notify(exception)
+        ErrorService.notify(exception)
       end
 
       private
@@ -153,7 +150,7 @@ module Api
       end
 
       def valid_user
-        if current_user.suspended
+        if current_user.suspended || current_user.plan.restricted?
           status_forbidden
         end
       end
