@@ -21,7 +21,6 @@ class UsersController < ApplicationController
       else
         redirect_to root_url
       end
-
     else
       render "new"
     end

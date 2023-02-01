@@ -28,6 +28,7 @@ class feedbin.Payments
         @button.mount "#payment_request_button"
       else
         $("body").addClass "no-native-payment"
+      $("body").addClass "payment-loaded"
 
     @plans[id].on "token", (event) =>
       @tokenHandler event.token
@@ -100,7 +101,7 @@ class feedbin.Payments
     style =
       base:
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif"
-        fontSize: "16px"
+        fontSize: "14px"
         fontSmoothing: "antialiased"
         color: @inputColor()
         "::placeholder":

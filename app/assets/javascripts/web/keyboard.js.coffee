@@ -251,10 +251,8 @@ class feedbin.Keyboard
       event.preventDefault()
 
     # Open original article
-    Mousetrap.bind 'V', (event, combo) =>
-      href = $('#source_link').attr('href')
-      if href
-        feedbin.openLinkInBackground(href)
+    Mousetrap.bind 'shift+v', (event, combo) =>
+      content = $('#source_link')[0].click()
       event.preventDefault()
 
     # Expand tag
@@ -303,7 +301,9 @@ class feedbin.Keyboard
     Mousetrap.bindGlobal 'escape', (event, combo) =>
       $('.dropdown-wrap.open').removeClass('open')
       $('.modal').modal('hide')
+      feedbin.hideFormatMenu()
       feedbin.hideSearch()
+      feedbin.closeEntryBasement()
       if $('[name="subscription[feeds][feed_url]"]').is(':focus')
         $('[name="subscription[feeds][feed_url]"]').blur()
         event.preventDefault()

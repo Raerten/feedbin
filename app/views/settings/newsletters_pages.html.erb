@@ -1,156 +1,141 @@
-<div class="settings-content-inner">
-    <div class="settings-outer">
-        <h2>Sources</h2>
-    </div>
+<%= component "settings/h1" do %>
+  Sources
+<% end %>
+<%= component "settings/control_group", class: "mb-14" do |group| %>
+  <% group.header do %>
+    Twitter
+  <% end %>
+  <% if @user.twitter_enabled? %>
+    <% group.item do %>
+      <%= component "settings/control_row" do |row| %>
+        <% row.title { "Account" } %>
+        <% row.description do %>
+          You are logged in to Twitter as <strong>@<%= @user.twitter_screen_name %></strong>.
+        <% end %>
+        <% row.control do %>
+          <%= link_to delete_twitter_authentications_path, method: :delete, class: "button button-secondary", data: {confirm: "Are you sure? This will deactivate your Twitter subscriptions."} do %>
+            <%= svg_tag "icon-twitter-logo", class: "fill-500" %> Sign Out
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% else %>
+    <% group.item do %>
+      <%= component "settings/control_row" do |row| %>
+        <% row.title { "Account" } %>
+        <% row.description do %>
+          Sign in to enable <a href="/blog/2018/01/11/feedbin-is-the-best-way-to-read-twitter/">Twitter subscriptions</a>.
+        <% end %>
+        <% row.control do %>
+          <%= link_to new_twitter_authentication_path({mode: "settings"}), class: "button button-secondary" do %>
+            <%= svg_tag "icon-twitter-logo", class: "fill-500" %> Sign In
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+<%= form_for @user, remote: true, url: settings_update_user_path(@user) do |f| %>
+  <%= component "settings/control_group", class: "mb-14" do |group| %>
+    <% group.header do %>
+      Newsletters
+    <% end %>
+    <% group.item do %>
+      <div class="py-4">
+        <div class="text-600">
+          Newsletter Address
+        </div>
+        <div class="text-500 text-sm mb-2">
+          Use this address to <a href="/blog/2016/02/03/subscribe-to-email-newsletters-in-feedbin/">receive emails</a> in Feedbin.
+        </div>
 
-    <div class="inset">
-        <h4 class="group-header">Twitter</h4>
-        <ul class="pill-list">
-            <% if @user.twitter_enabled? %>
-            <li>
-                <div class="toolbar">
-                    <div>
-                    Account
-                    <p class="control-group-description">
-                        You are logged in to Twitter as <strong>@<%= @user.twitter_screen_name %></strong>.
-                    </p>
-                    </div>
-                    <%= render "shared/input", class: "last-control accessory-left" do %>
-                        <%= link_to "Log Out", delete_twitter_authentications_path, method: :delete, class: "button button-secondary", data: {confirm: "Are you sure? This will deactivate your Twitter subscriptions."} %>
-                        <span class="accessory">
-                            <%= svg_tag "icon-twitter-logo" %>
-                        </span>
-                    <% end %>
-                </div>
-            </li>
-            <% else %>
-            <li>
-                <div class="toolbar">
-                    <div>
-                    Account
-                    <p class="control-group-description">
-                        Sign in to enable <a href="/blog/2018/01/11/feedbin-is-the-best-way-to-read-twitter/">Twitter subscriptions</a>.
-                    </p>
-                    </div>
-                    <%= render "shared/input", class: "last-control accessory-left" do %>
-                        <%= link_to "Sign In", new_twitter_authentication_path({mode: "settings"}), class: "button button-secondary" %>
-                        <span class="accessory">
-                            <%= svg_tag "icon-twitter-logo" %>
-                        </span>
-                    <% end %>
-                </div>
-            </li>
+        <%= component "form/text_input" do |text| %>
+          <% text.input do %>
+            <input type="text" value="<%= @user.newsletter_address %>" readonly class="text-input" />
+          <% end %>
+          <% text.accessory_trailing_cap position: "trailing" do %>
+            <%= button_tag data: {controller: "copyable", action: "copyable#copy", copyable_data_value: @user.newsletter_address, copyable_success_value: false }, class: "px-6 inset-y-0 group" do %>
+              <span class="group-data-[copyable-success-value=true]:tw-hidden">Copy</span>
+              <span class="group-data-[copyable-success-value=false]:tw-hidden flex items-center gap-2 fill-green-600"><%= svg_tag "icon-check" %> Copied</span>
             <% end %>
-        </ul>
-    </div>
-
-
-    <%= form_for @user, remote: true, url: settings_update_user_path(@user) do |f| %>
-        <div class="inset">
-            <h4 class="group-header">Newsletters</h4>
-            <ul class="pill-list">
-                <li>
-                    <div class="toolbar">
-                        <div>
-                            Newsletter Address
-                            <p class="control-group-description">
-                                Use this address to <a href="/blog/2016/02/03/subscribe-to-email-newsletters-in-feedbin/">receive emails</a> in Feedbin.
-                            </p>
-                        </div>
-                        <%= render "shared/input", class: "accessory-right last-control" do %>
-                            <input type="text" value="<%= @user.newsletter_address %>" readonly />
-                            <button class="accessory right icon" data-behavior="copy" title="Copy to clipboard" data-toggle="tooltip">
-                                <%= svg_tag "icon-clipboard" %>
-                            </button>
-                        <% end %>
-                    </div>
-                </li>
-                <li>
-                    <div class="toolbar">
-                        <div>
-                            Default Tag
-                            <p class="control-group-description">
-                                Automatically put incoming newsletters in this tag.
-                            </p>
-                        </div>
-                            <%= render "shared/input", class: "accessory-right last-control" do %>
-                                <%= f.select :newsletter_tag, tag_options, {}, {class: "select", data: {behavior: "auto_submit"}} %>
-                                <span class="accessory right">
-                                    <%= svg_tag "icon-caret" %>
-                                </span>
-                            <% end %>
-                    </div>
-                </li>
-            </ul>
-        </div>
+          <% end %>
+        <% end %>
+      </div>
     <% end %>
-
-    <div class="inset">
-        <h4 class="group-header">Pages</h4>
-        <ul class="pill-list">
-            <li>
-                <div class="toolbar">
-                    <div>
-                        Bookmarklet
-                        <p class="control-group-description">
-                            Drag this to your bookmarks bar. Use it to <a href="/blog/2019/08/20/save-webpages-to-read-later/">save articles from the web</a> to Feedbin.
-                        </p>
-                    </div>
-                    <div class="last-control">
-                        <%= render "shared/input", class: "accessory-left accessory-right grabber-wrap" do %>
-                            <%= bookmarklet %>
-                            <span class="accessory">
-                                <%= svg_tag "favicon-saved" %>
-                            </span>
-                            <span class="accessory right grabber-icon">
-                                <%= svg_tag "icon-grabber" %>
-                            </span>
-                        <% end %>
-                    </div>
-                </div>
-            </li>
-        </ul>
-    </div>
-
-    <% if @user.newsletter_senders.exists? %>
-        <div class="inset">
-            <h4 class="group-header">Advanced</h4>
-            <ul class="sharing-services">
-                <li>
-                    <div class="service-header">
-                        <div>
-                            <div class="header">
-                                <p class="service-title">Newsletter Senders</p>
-                            </div>
-                            <p class="control-group-description" style="margin-left: 0;">These are the senders of newsletters you have received. Feedbin blocks messages from senders that have been deactivated. Reactivate a sender to resubscribe.</p>
-                        </div>
-                        <div class="last-control button-wrap-inline">
-                            <%= button_tag "Show Senders", class: 'button button-secondary', data: {behavior: "toggle_service_options", toggle_text: "Hide Senders"} %>
-                        </div>
-                    </div>
-                    <div class="service-options-wrap">
-                        <div class="service-options nested-controls">
-                            <ul class="control-group">
-                                <% @user.newsletter_senders.each do |newsletter_sender| %>
-                                   <li>
-                                        <%= form_with(model: newsletter_sender, url: newsletter_senders_settings_subscription_path(newsletter_sender.feed_id), data: {remote: true}) do |f| %>
-                                            <%= f.check_box :feed_id, {id: "newsletter_sender_#{newsletter_sender.feed_id}", checked: @subscription_ids.include?(newsletter_sender.feed_id), data: {behavior: "auto_submit"}} %>
-                                            <%= f.label :feed_id, for: "newsletter_sender_#{newsletter_sender.feed_id}" do %>
-                                               <%= newsletter_sender.name %> <span class="extra-muted">&lt;<%= newsletter_sender.email %>&gt;</span> <%= toggle_switch %>
-                                               <% if newsletter_sender.full_token != newsletter_sender.token %>
-                                                   <p class="control-group-description">
-                                                       <%= "Sent to #{newsletter_sender.full_token}@newsletters.feedbin.com" %>
-                                                   </p>
-                                               <% end %>
-                                            <% end %>
-                                        <% end %>
-                                   </li>
-                                <% end %>
-                            </ul>
-                        </div>
-                    </div>
-                </li>
-            </ul>
-        </div>
+    <% group.item do %>
+      <%= component "settings/control_row" do |row| %>
+        <% row.title { "Default Tag" } %>
+        <% row.description do %>
+          Automatically put incoming newsletters in this tag.
+        <% end %>
+        <% row.control do %>
+          <%= component "form/select_input" do |input| %>
+            <% input.input do %>
+              <%= f.select :newsletter_tag, tag_options, {}, {class: "peer", data: {behavior: "auto_submit"}} %>
+            <% end %>
+            <% input.accessory_leading do %>
+              <%= svg_tag "favicon-tag", class: "fill-500" %>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
     <% end %>
-</div>
+  <% end %>
+<% end %>
+<%= component "settings/control_group", class: "mb-14" do |group| %>
+  <% group.header do %>
+    Pages
+  <% end %>
+  <% group.item do %>
+    <%= component "settings/control_row" do |row| %>
+      <% row.title { "Bookmarklet" } %>
+      <% row.description do %>
+        Drag this to your bookmarks bar. Use it to <a href="/blog/2019/08/20/save-webpages-to-read-later/">save articles from the web</a> to Feedbin.
+      <% end %>
+      <% row.control do %>
+        <%= link_to bookmarklet, onclick: "return false;", class: "button-secondary cursor-move" do %>
+          <%= svg_tag "favicon-saved", class: "fill-500" %>
+          Send to Feedbin
+          <%= svg_tag "icon-grabber", class: "ml-6 fill-700" %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+<% if @user.newsletter_senders.exists? %>
+  <%= component "settings/expandable" do |expandable| %>
+    <% expandable.header do %>
+      Advanced
+    <% end %>
+    <% expandable.description do %>
+      <%= component "settings/control_row" do |row| %>
+        <% row.title { "Newsletter Senders" } %>
+        <% row.description do %>
+          These are the senders of newsletters you have received. Feedbin blocks messages from senders that have been deactivated. Reactivate a sender to resubscribe.
+        <% end %>
+        <% row.control do %>
+          <%= button_tag "Show Senders", class: 'button button-secondary', data: {action: "expandable#toggle", toggle_text: "Hide Senders"} %>
+        <% end %>
+      <% end %>
+    <% end %>
+    <% @user.newsletter_senders.each do |newsletter_sender| %>
+      <% expandable.item do %>
+        <%= form_with(model: newsletter_sender, url: newsletter_senders_settings_subscription_path(newsletter_sender.feed_id), namespace: newsletter_sender.feed_id, data: {remote: true}) do |f| %>
+          <%= f.check_box :feed_id, {checked: @subscription_ids.include?(newsletter_sender.feed_id), class: "peer", data: {behavior: "auto_submit"}} %>
+          <%= f.label :feed_id, class: "group" do %>
+            <%= component "settings/control_row_switch" do |row| %>
+              <% row.title do %>
+                <%= newsletter_sender.name %> <span class="text-500">&lt;<%= newsletter_sender.email %>&gt;</span>
+              <% end %>
+              <% if newsletter_sender.full_token != newsletter_sender.token %>
+                <% row.description do %>
+                  Sent to <%= newsletter_sender.full_token %>@newsletters.feedbin.com
+                <% end %>
+              <% end %>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

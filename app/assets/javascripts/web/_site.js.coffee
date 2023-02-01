@@ -28,6 +28,20 @@ $.extend feedbin,
   loadingMore: false
   remoteContentIntervals: {}
 
+  hideFormatMenu: (event) ->
+    menu = $('.format-palette')
+    button = $('[data-behavior~=show_format_menu]')
+    hide = ->
+      if feedbin.formatMenu
+        feedbin.formatMenu.destroy()
+        feedbin.formatMenu = null
+        menu.addClass('hide')
+    if event
+      if !feedbin.isRelated(menu, event.target) && !feedbin.isRelated(button, event.target)
+        hide()
+    else
+      hide()
+
   prepareShareMenu: (data) ->
     buildLink = (item, data, index) ->
       href = item.url
@@ -550,7 +564,7 @@ $.extend feedbin,
       container.removeClass('fade-out')
     setTimeout callback, 200
 
-  showNotification: (text, error = false) ->
+  showNotification: (text, error = false, url = null) ->
     clearTimeout(feedbin.notificationTimeout)
 
     container = $('[data-behavior~=notification_container]')
@@ -567,7 +581,12 @@ $.extend feedbin,
     container.addClass('visible')
     container.addClass('error') if error
 
-    content.text(text)
+    if url && url != ""
+      link = $('<a>').attr('href', url)
+      link.text(text)
+      content.html(link)
+    else
+      content.text(text)
 
     feedbin.notificationTimeout = setTimeout feedbin.hideNotification, 3000
 
@@ -914,7 +933,7 @@ $.extend feedbin,
   fullWidthImage: (img) ->
     load = ->
       width = img.get(0).naturalWidth
-      if width > 528 && img.parents(".modal").length == 0
+      if width > 528 && img.parents(".modal").length == 0  && img.parents("table").length == 0  && img.parents("blockquote").length == 0  && img.parents("table").length == 0  && img.parents("li").length == 0
         img.addClass("full-width")
       img.addClass("show")
 
@@ -1207,25 +1226,27 @@ $.extend feedbin,
     $('.sharing-controls [type="checkbox"]').attr('checked', false);
 
     title = $('.entry-header h1').first().text()
-    $('.share-form .title-placeholder').val(title)
+    $('[data-behavior~=share_form] .title-placeholder').val(title)
 
-    url = $('.entry-header a').first().attr('href')
-    $('.share-form .url-placeholder').val(url)
+    url = $('#source_link').attr('href')
+    $('[data-behavior~=share_form] .url-placeholder').val(url)
 
     description = feedbin.getSelectedText()
-    url = $('#source_link').attr('href')
-    $('.share-form .description-placeholder').val("#{description}")
+    $('[data-behavior~=share_form] .description-placeholder').val("#{description}")
+
+    parts = _.compact([title, url])
+    $('[data-behavior~=share_form] .combined-placeholder').val(parts.join(" "))
 
     if description != ""
-      $('[data-basement-panel-target="micro_blog_share_panel"] .share-form .description-placeholder').val("#{description} #{url}")
+      $('[data-basement-panel-target="micro_blog_share_panel"] [data-behavior~=share_form] .description-placeholder').val("#{description} #{url}")
     else
-      $('[data-basement-panel-target="micro_blog_share_panel"] .share-form .description-placeholder').val("#{url}")
+      $('[data-basement-panel-target="micro_blog_share_panel"] [data-behavior~=share_form] .description-placeholder').val("#{url}")
 
 
     source = $('.entry-header .author').first().text()
     if source == ""
       source = $('.entry-header .feed-title').first().text()
-    $('.share-form .source-placeholder').val(source)
+    $('[data-behavior~=share_form] .source-placeholder').val(source)
 
     if feedbin.readabilityActive()
       $('.readability-placeholder').val('on')
@@ -1248,10 +1269,11 @@ $.extend feedbin,
   closeEntryBasement: (timeout = 200) ->
     feedbin.closeEntryBasementTimeount = setTimeout ( ->
       $('.basement-panel').addClass('hide')
-      $('.field-cluster input').blur()
+      $('.field-cluster input, .field-cluster textarea').blur()
       $('.entry-basement').removeClass('open')
     ), timeout
 
+    $('body').removeClass('has-entry-basement')
     $('.entry-basement').removeClass('foreground')
     $('.entry-content').each ->
       @.style.removeProperty("top")
@@ -1261,7 +1283,7 @@ $.extend feedbin,
   openEntryBasement: (selectedPanel) ->
     feedbin.openEntryBasementTimeount = setTimeout ( ->
       $('.entry-basement').addClass('foreground')
-      $('.field-cluster input', selectedPanel).first().select()
+      $('.field-cluster input, .field-cluster textarea', selectedPanel).first().select()
     ), 200
 
     clearTimeout(feedbin.closeEntryBasementTimeount)
@@ -1275,6 +1297,7 @@ $.extend feedbin,
     $('.entry-content').css
       "top": "#{newTop}px"
     selectedPanel.prop('scrollTop', 0)
+    $('body').addClass('has-entry-basement')
 
   applyStarred: (entryId) ->
     if feedbin.Counts.get().isStarred(entryId)
@@ -1402,6 +1425,7 @@ $.extend feedbin,
     classes = modal[0].className.split(/\s+/)
     classPrefix = "modal-purpose"
     modalClass = "#{classPrefix}-#{target}"
+    feedbin.hideFormatMenu()
 
     content = $($("[data-modal-purpose=#{target}]").html())
 
@@ -1856,12 +1880,7 @@ $.extend feedbin,
 
     showFormatMenu: ->
       $(document).on 'click', (event) ->
-        menu = $('.format-palette')
-        button = $('[data-behavior~=show_format_menu]')
-        if !feedbin.isRelated(menu, event.target) && !feedbin.isRelated(button, event.target) && feedbin.formatMenu
-          feedbin.formatMenu.destroy()
-          feedbin.formatMenu = null
-          menu.addClass('hide')
+        feedbin.hideFormatMenu(event)
 
       $(document).on 'click', '[data-behavior~=show_format_menu]', (event) ->
         $('.dropdown-wrap.open').removeClass('open')
@@ -2003,29 +2022,6 @@ $.extend feedbin,
           $(@).closest('form').submit()
 
     checkBoxToggle: ->
-      $(document).on 'change', '[data-behavior~=include_all]', (event) ->
-        if $(@).is(':checked')
-          $('[data-behavior~=toggle_checked_target] [type="checkbox"][name]').prop('checked', true).change()
-          $('[data-behavior~=toggle_checked_target] [type="checkbox"][name]').prop('disabled', true)
-        else
-          $('[data-behavior~=toggle_checked_target] [type="checkbox"][name]').prop('disabled', false)
-
-      $(document).on 'change', '[data-behavior~=toggle_checked]', (event) ->
-        $('[data-behavior~=toggle_checked_hidden]').toggleClass('hide')
-        $('[data-behavior~=toggle_checked_hidden] [type="checkbox"]').prop('checked', false).change()
-        if $(@).is(':checked')
-          $('[data-behavior~=toggle_checked_target] [type="checkbox"][name]').prop('checked', true).change()
-        else
-          $('[data-behavior~=toggle_checked_target] [type="checkbox"][name]').prop('checked', false).change()
-        event.preventDefault()
-        return
-
-      $(document).on 'change', '[data-behavior~=enable_control]', (event) ->
-        if $('[data-behavior~=enable_control]:checked').length == 0
-          $('[data-behavior~=enable_control_target]').prop('disabled', true)
-        else
-          $('[data-behavior~=enable_control_target]').prop('disabled', false)
-
       $(document).on 'change', '[data-behavior~=check_feeds]', (event) ->
         checkboxes = $('[data-behavior~=collection_checkbox]')
         if $(@).is(':checked')
@@ -2098,18 +2094,6 @@ $.extend feedbin,
 
     entryBasement: ->
 
-      $(document).on 'click', (event, xhr) ->
-        if ($(event.target).hasClass('entry-basement') || $(event.target).parents('.entry-basement').length > 0)
-          false
-
-        isButton = (event) ->
-          $(event.target).is('[data-behavior~=show_entry_basement]') ||
-          $(event.target).parents('[data-behavior~=show_entry_basement]').length > 0
-
-        if !isButton(event) && $(event.target).parents('.entry-basement').length == 0
-          feedbin.closeEntryBasement()
-        return
-
       $(document).on 'click', '[data-behavior~=show_entry_basement]', (event, xhr) ->
         panelName = $(@).data('basement-panel')
         selectedPanel = $("[data-basement-panel-target=#{panelName}]")
@@ -2133,7 +2117,7 @@ $.extend feedbin,
         event.preventDefault()
         return
 
-      $(document).on 'submit', '.share-form form', (event, xhr) ->
+      $(document).on 'submit', '[data-behavior~=share_form] form', (event, xhr) ->
         feedbin.closeEntryBasement()
         return
 
@@ -2256,11 +2240,11 @@ $.extend feedbin,
 
     formProcessing: ->
       $(document).on 'submit', '[data-behavior~=spinner], [data-behavior~=subscription_form], [data-behavior~=search_form], [data-behavior~=feeds_search]', ->
-        $(@).find('input').addClass('processing')
+        $(@).attr('data-processing', 'true')
         return
 
       $(document).on 'ajax:complete', '[data-behavior~=spinner], [data-behavior~=subscription_form], [data-behavior~=search_form], [data-behavior~=feeds_search]', ->
-        $(@).find('input').removeClass('processing')
+        $(@).attr('data-processing', 'false')
         if feedbin.closeSubcription
           setTimeout ( ->
             feedbin.hideSubscribe()
@@ -2271,22 +2255,6 @@ $.extend feedbin,
     searchError: ->
       $(document).on 'ajax:error', '[data-behavior~=search_form]', (event, xhr) ->
         feedbin.showNotification('Search error.', true);
-        return
-
-    showPushOptions: ->
-      if "safari" of window and "pushNotification" of window.safari
-        $('body').addClass('supports-push')
-        if $('#push-data').length > 0
-          $('.push-options').removeClass('hide')
-          data = $('#push-data').data()
-          permissionData = window.safari.pushNotification.permission(data.websiteId)
-          feedbin.checkPushPermission(permissionData )
-
-    enablePush: ->
-      $(document).on 'click', '[data-behavior~=enable_push]', (event) ->
-        data = $('#push-data').data()
-        window.safari.pushNotification.requestPermission(data.webServiceUrl, data.websiteId, {authentication_token: data.authenticationToken}, feedbin.checkPushPermission)
-        event.preventDefault()
         return
 
     deleteAssociatedRecord: ->
@@ -2363,7 +2331,7 @@ $.extend feedbin,
       return
 
     appearanceRadio: ->
-      $('[data-behavior~=appearance_radio]').on 'change', (event) ->
+      $(document).on 'change', '[data-behavior~=appearance_radio]', (event) ->
         selected = $(@).val()
         setting = $(@).data('setting')
         name = $(@).attr('name')
@@ -2417,14 +2385,14 @@ $.extend feedbin,
         description = $(@).find("option:selected").data('description-name')
         typeText = $(@).find("option:selected").text()
         if type == 'quote'
-          $('.share-form .source-placeholder-wrap').removeClass('hide')
-          $('.share-form .title-placeholder-wrap').addClass('hide')
+          $('[data-behavior~=share_form] .source-placeholder-wrap').removeClass('hide')
+          $('[data-behavior~=share_form] .title-placeholder-wrap').addClass('hide')
         else
-          $('.share-form .source-placeholder-wrap').addClass('hide')
-          $('.share-form .title-placeholder-wrap').removeClass('hide')
+          $('[data-behavior~=share_form] .source-placeholder-wrap').addClass('hide')
+          $('[data-behavior~=share_form] .title-placeholder-wrap').removeClass('hide')
 
-        $('.share-form .type-text').text(typeText)
-        $('.share-form .description-placeholder').attr('placeholder', description)
+        $('[data-behavior~=share_form] .type-text').text(typeText)
+        $('[data-behavior~=share_form] .description-placeholder').attr('placeholder', description)
 
     dragAndDrop: ->
       feedbin.droppable()
@@ -2555,8 +2523,6 @@ $.extend feedbin,
         if !feedbin.isRelated('.embed-link', event.target)
           iframe = $("<iframe>").attr
             "src": $(@).data("iframe-src")
-            "width": $(@).data("iframe-width")
-            "height": $(@).data("iframe-height")
             "allowfullscreen": true
             "frameborder": 0
 
@@ -2843,7 +2809,7 @@ $.extend feedbin,
         target = event.currentTarget
         controller = $(target).closest('[data-behavior~=tooltip_controller]')
         tooltipTarget = $('[data-behavior~=tooltip_target]', controller)
-        tooltipTarget.addClass("hide")
+        tooltipTarget.attr("data-visible", "false")
 
       $(document).on 'mouseover', '[data-behavior~=show_tooltip]', (event) ->
         bar = event.currentTarget
@@ -2854,7 +2820,7 @@ $.extend feedbin,
         dayTarget = $('[data-behavior~=tooltip_day]', tooltipTarget)
         countTarget = $('[data-behavior~=tooltip_count]', tooltipTarget)
 
-        tooltipTarget.removeClass('hide')
+        tooltipTarget.attr("data-visible", "true")
         dayTarget.text(bar.dataset.day)
         countTarget.text(bar.dataset.count)
 
@@ -2866,10 +2832,11 @@ $.extend feedbin,
           left: 'auto'
 
         if bar.offsetLeft < parentWidth / 2
-          tooltipTarget.removeClass("right")
+          tooltipTarget.attr("data-position", "left")
           tooltipTarget.css
             left: "#{bar.offsetLeft - 14}px"
         else
+          tooltipTarget.attr("data-position", "right")
           tooltipTarget.addClass("right")
           tooltipTarget.css
             right: "#{parentWidth - bar.offsetLeft - 18}px"

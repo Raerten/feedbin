@@ -400,7 +400,8 @@ CREATE TABLE public.devices (
     updated_at timestamp without time zone,
     application text,
     operating_system text,
-    active boolean DEFAULT true
+    active boolean DEFAULT true,
+    data jsonb DEFAULT '{}'::jsonb
 );
 
 
@@ -489,7 +490,10 @@ CREATE TABLE public.entries (
     main_tweet_id text,
     queued_entries_count bigint DEFAULT 0 NOT NULL,
     fingerprint uuid,
-    guid uuid
+    guid uuid,
+    provider bigint,
+    provider_id text,
+    provider_parent_id text
 );
 
 
@@ -767,6 +771,38 @@ ALTER SEQUENCE public.newsletter_senders_id_seq OWNED BY public.newsletter_sende
 
 
 --
+-- Name: oauth_servers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.oauth_servers (
+    id bigint NOT NULL,
+    host text NOT NULL,
+    data jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: oauth_servers_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.oauth_servers_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: oauth_servers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.oauth_servers_id_seq OWNED BY public.oauth_servers.id;
+
+
+--
 -- Name: plans; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -934,6 +970,41 @@ CREATE SEQUENCE public.recently_read_entries_id_seq
 --
 
 ALTER SEQUENCE public.recently_read_entries_id_seq OWNED BY public.recently_read_entries.id;
+
+
+--
+-- Name: remote_files; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.remote_files (
+    id bigint NOT NULL,
+    fingerprint uuid NOT NULL,
+    original_url text NOT NULL,
+    storage_url text NOT NULL,
+    data jsonb DEFAULT '{}'::jsonb,
+    settings jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: remote_files_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.remote_files_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: remote_files_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.remote_files_id_seq OWNED BY public.remote_files.id;
 
 
 --
@@ -1163,7 +1234,8 @@ CREATE TABLE public.supported_sharing_services (
     settings public.hstore,
     service_options json,
     created_at timestamp without time zone,
-    updated_at timestamp without time zone
+    updated_at timestamp without time zone,
+    status bigint DEFAULT 0 NOT NULL
 );
 
 
@@ -1259,7 +1331,8 @@ CREATE TABLE public.twitter_users (
     screen_name text NOT NULL,
     data jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    profile_image_url text
 );
 
 
@@ -1535,6 +1608,13 @@ ALTER TABLE ONLY public.newsletter_senders ALTER COLUMN id SET DEFAULT nextval('
 
 
 --
+-- Name: oauth_servers id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_servers ALTER COLUMN id SET DEFAULT nextval('public.oauth_servers_id_seq'::regclass);
+
+
+--
 -- Name: plans id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1567,6 +1647,13 @@ ALTER TABLE ONLY public.recently_played_entries ALTER COLUMN id SET DEFAULT next
 --
 
 ALTER TABLE ONLY public.recently_read_entries ALTER COLUMN id SET DEFAULT nextval('public.recently_read_entries_id_seq'::regclass);
+
+
+--
+-- Name: remote_files id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.remote_files ALTER COLUMN id SET DEFAULT nextval('public.remote_files_id_seq'::regclass);
 
 
 --
@@ -1821,6 +1908,14 @@ ALTER TABLE ONLY public.newsletter_senders
 
 
 --
+-- Name: oauth_servers oauth_servers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_servers
+    ADD CONSTRAINT oauth_servers_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: plans plans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1858,6 +1953,14 @@ ALTER TABLE ONLY public.recently_played_entries
 
 ALTER TABLE ONLY public.recently_read_entries
     ADD CONSTRAINT recently_read_entries_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: remote_files remote_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.remote_files
+    ADD CONSTRAINT remote_files_pkey PRIMARY KEY (id);
 
 
 --
@@ -2112,6 +2215,13 @@ CREATE INDEX index_entries_on_main_tweet_id ON public.entries USING btree (main_
 
 
 --
+-- Name: index_entries_on_provider_and_provider_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_entries_on_provider_and_provider_id ON public.entries USING btree (provider, provider_id) WHERE ((provider IS NOT NULL) AND (provider_id IS NOT NULL));
+
+
+--
 -- Name: index_entries_on_public_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2245,6 +2355,13 @@ CREATE INDEX index_newsletter_senders_on_token ON public.newsletter_senders USIN
 
 
 --
+-- Name: index_oauth_servers_on_host; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_oauth_servers_on_host ON public.oauth_servers USING btree (host);
+
+
+--
 -- Name: index_podcast_subscriptions_on_feed_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2361,6 +2478,13 @@ CREATE UNIQUE INDEX index_recently_read_entries_on_user_id_and_entry_id ON publi
 --
 
 CREATE INDEX index_recently_read_entries_on_user_id_and_id ON public.recently_read_entries USING btree (user_id, id DESC);
+
+
+--
+-- Name: index_remote_files_on_fingerprint; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_remote_files_on_fingerprint ON public.remote_files USING btree (fingerprint);
 
 
 --
@@ -2944,6 +3068,13 @@ INSERT INTO "schema_migrations" (version) VALUES
 ('20220909105317'),
 ('20220916104628'),
 ('20220926154041'),
-('20221004142045');
+('20221004142045'),
+('20221208231846'),
+('20221215200606'),
+('20221219141006'),
+('20221220140655'),
+('20221222204921'),
+('20230101160218'),
+('20230130211416');
 
 

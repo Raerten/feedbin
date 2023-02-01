@@ -1,12 +1,18 @@
 class IframeEmbed::Instagram
   attr_reader :url
 
+  def self.download(*args)
+    instance = new(*args)
+    instance.screen_name
+    instance
+  end
+
   def initialize(url)
     @url = url
   end
 
   def screen_name
-    data.dig("author_name")
+    data.safe_dig("author_name")
   end
 
   def permalink
@@ -18,7 +24,7 @@ class IframeEmbed::Instagram
   end
 
   def media_url
-    data.dig("thumbnail_url")
+    data.safe_dig("thumbnail_url")
   end
 
   def profile_image_url

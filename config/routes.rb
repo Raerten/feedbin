@@ -2,15 +2,18 @@ require "sidekiq/web"
 Sidekiq::Web.app_url = ENV["FEEDBIN_URL"]
 
 Rails.application.routes.draw do
-  # The priority is based upon order of creation: first created -> highest priority.
-  # See how all your routes lay out with "rake routes".
-
   root to: "site#index"
 
   mount StripeEvent::Engine, at: "/stripe"
+
   constraints lambda { |request| AuthConstraint.admin?(request) } do
-    mount Sidekiq::Web => "sidekiq"
+    mount Lookbook::Engine, at: "/lookbook"
   end
+
+  constraints lambda { |request| AuthConstraint.admin?(request) } do
+    mount Sidekiq::Web, at: "/sidekiq"
+  end
+
   get :health_check, to: proc { |env| [200, {}, ["OK"]] }
   get :version, to: proc { |env| [200, {}, [File.read("REVISION")]] }
   get :subscribe, to: "site#subscribe"
@@ -67,6 +70,7 @@ Rails.application.routes.draw do
   resources :password_resets
   resources :sharing_services, path: "settings/sharing", only: [:index, :create, :update, :destroy]
   resources :actions, path: "settings/actions", only: [:index, :create, :new, :update, :destroy, :edit]
+  resources :devices, only: [:create]
   resources :account_migrations, path: "settings/account_migrations" do
     member do
       patch :start
@@ -96,6 +100,7 @@ Rails.application.routes.draw do
   resources :supported_sharing_services, only: [:create, :destroy, :update] do
     member do
       get :oauth_response
+      get :oauth2_response
       get :autocomplete
       match "share/:entry_id", to: "supported_sharing_services#share", as: :share, via: [:get, :post]
     end
@@ -175,18 +180,24 @@ Rails.application.routes.draw do
     resources :imports, only: [:create, :show]
     get :import_export, to: "imports#index"
 
+    get :billing, to: "billings#index"
+    resource :billing, only: [] do
+      collection do
+        get :edit
+        get :payment_history
+        get :payment_details
+        post :update_credit_card
+        post :update_plan
+      end
+    end
+
     get :account
-    get :billing
-    get :payment_details
     get :appearance
     get :newsletters_pages
-    post :update_credit_card
-    post :update_plan
     post :now_playing
     post :audio_panel_size
   end
 
-  get "settings/billing/edit", as: :settings_edit_billing, to: "settings#edit_billing"
   post "settings/sticky/:feed_id", as: :settings_sticky, to: "settings#sticky"
   post "settings/subscription_view_mode/:feed_id", as: :settings_subscription_view_mode, to: "settings#subscription_view_mode"
 
@@ -231,6 +242,12 @@ Rails.application.routes.draw do
     collection do
       get :modal
       get :cache
+    end
+  end
+
+  resources :remote_files, path: :files, only: [] do
+    collection do
+      get "icons/:signature/:url", action: :icon, as: :icon
     end
   end
 

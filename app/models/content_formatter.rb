@@ -66,7 +66,7 @@ class ContentFormatter
 
   ALLOWLIST_DEFAULT = ALLOWLIST_BASE.clone.tap do |hash|
     transformers = Transformers.new
-    hash[:transformers] = [transformers.class_allowlist, transformers.table_elements, transformers.top_level_li, transformers.video]
+    hash[:transformers] = [transformers.class_allowlist, transformers.table_elements, transformers.top_level_li, transformers.video, transformers.links]
   end
 
   ALLOWLIST_NEWSLETTER = ALLOWLIST_BASE.clone.tap do |hash|
@@ -120,10 +120,10 @@ class ContentFormatter
       filters.unshift(HTML::Pipeline::AbsoluteSourceFilter)
       filters.unshift(HTML::Pipeline::AbsoluteHrefFilter)
 
-      context[:image_base_url]    = base_url || entry.feed.site_url
-      context[:image_subpage_url] = base_url || entry.url || ""
-      context[:href_base_url]     = base_url || entry.feed.site_url
-      context[:href_subpage_url]  = base_url || entry.url || ""
+      context[:image_base_url]    = base_url || entry.base_url
+      context[:image_subpage_url] = base_url || entry.fully_qualified_url || ""
+      context[:href_base_url]     = base_url || entry.base_url
+      context[:href_subpage_url]  = base_url || entry.fully_qualified_url || ""
 
       if entry && entry.feed.newsletter?
         context[:whitelist] = ALLOWLIST_NEWSLETTER
@@ -174,10 +174,10 @@ class ContentFormatter
   def _absolute_source(content, entry, base_url = nil)
     filters = [HTML::Pipeline::AbsoluteSourceFilter, HTML::Pipeline::AbsoluteHrefFilter]
     context = {
-      image_base_url:    base_url || entry.feed.site_url,
-      image_subpage_url: base_url || entry.url            || "",
-      href_base_url:     base_url || entry.feed.site_url,
-      href_subpage_url:  base_url || entry.url            || ""
+      image_base_url:    base_url || entry.base_url,
+      image_subpage_url: base_url || entry.fully_qualified_url || "",
+      href_base_url:     base_url || entry.base_url,
+      href_subpage_url:  base_url || entry.fully_qualified_url || ""
     }
     pipeline = HTML::Pipeline.new filters, context
     result = pipeline.call(content)
@@ -191,15 +191,15 @@ class ContentFormatter
   end
 
   def _api_format(content, entry)
-    filters = [HTML::Pipeline::AbsoluteSourceFilter, HTML::Pipeline::AbsoluteHrefFilter, HTML::Pipeline::ProtocolFilter]
+    filters = [HTML::Pipeline::AbsoluteSourceFilter, HTML::Pipeline::AbsoluteHrefFilter, HTML::Pipeline::ProtocolFilter, HTML::Pipeline::SanitizationFilter]
     context = {
-      image_base_url: entry.feed.site_url,
-      image_subpage_url: entry.url || "",
-      href_base_url: entry.feed.site_url,
-      href_subpage_url: entry.url || ""
+      image_base_url: entry.base_url,
+      image_subpage_url: entry.fully_qualified_url || "",
+      href_base_url: entry.base_url,
+      href_subpage_url: entry.fully_qualified_url || ""
     }
+    context[:whitelist] = ALLOWLIST_DEFAULT
     if entry.feed.newsletter?
-      filters.push(HTML::Pipeline::SanitizationFilter)
       context[:whitelist] = ALLOWLIST_NEWSLETTER
     end
     pipeline = HTML::Pipeline.new filters, context
@@ -216,10 +216,10 @@ class ContentFormatter
   def _app_format(content, entry)
     filters = [HTML::Pipeline::AbsoluteSourceFilter, HTML::Pipeline::AbsoluteHrefFilter, HTML::Pipeline::ProtocolFilter, HTML::Pipeline::ImagePlaceholderFilter]
     context = {
-      image_base_url: entry.feed.site_url,
-      image_subpage_url: entry.url || "",
-      href_base_url: entry.feed.site_url,
-      href_subpage_url: entry.url || "",
+      image_base_url: entry.base_url,
+      image_subpage_url: entry.fully_qualified_url || "",
+      href_base_url: entry.base_url,
+      href_subpage_url: entry.fully_qualified_url || "",
       placeholder_url: "",
       placeholder_attribute: "data-feedbin-src"
     }
@@ -238,10 +238,10 @@ class ContentFormatter
     filters = [HTML::Pipeline::SanitizationFilter, HTML::Pipeline::SrcFixer, HTML::Pipeline::AbsoluteSourceFilter, HTML::Pipeline::AbsoluteHrefFilter, HTML::Pipeline::ProtocolFilter]
     context = {
       whitelist: ALLOWLIST_EVERNOTE,
-      image_base_url: entry.feed.site_url,
-      image_subpage_url: entry.url || "",
-      href_base_url: entry.feed.site_url,
-      href_subpage_url: entry.url || ""
+      image_base_url: entry.base_url,
+      image_subpage_url: entry.fully_qualified_url || "",
+      href_base_url: entry.base_url,
+      href_subpage_url: entry.fully_qualified_url || ""
     }
 
     pipeline = HTML::Pipeline.new filters, context

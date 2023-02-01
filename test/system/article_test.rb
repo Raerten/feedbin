@@ -14,9 +14,9 @@ class ArticleTest < ApplicationSystemTestCase
 
     login_as(@user)
 
-    click_link(entry.tweet_summary)
+    click_link(entry.tweet.tweet_summary)
 
-    assert_selector ".tweet-text", text: entry.tweet_summary
+    assert_selector ".tweet-text", text: entry.tweet.tweet_summary
   end
 
   test "star" do
@@ -75,12 +75,10 @@ class ArticleTest < ApplicationSystemTestCase
     sleep 1
     wait_for_ajax
 
-    pipeline = HTML::Pipeline::CamoFilter.new(nil, { asset_proxy: ENV["CAMO_HOST"], asset_proxy_secret_key: ENV["CAMO_KEY"] }, nil)
-    url = pipeline.asset_proxy_url("https://pbs.twimg.com/profile_images/659486593649012736/-TGFT8rs_bigger.png")
+    url = RemoteFile.signed_url("https://pbs.twimg.com/profile_images/659486593649012736/-TGFT8rs.png")
 
     assert_selector ".profile-image img[src='#{url}']"
     assert_selector ".tweet-body", text: "iOS 14 will let you"
-
   end
 
   test "diff" do

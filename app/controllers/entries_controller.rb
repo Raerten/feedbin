@@ -67,11 +67,15 @@ class EntriesController < ApplicationController
 
   def preload
     @user = current_user
-    ids = params[:ids].split(",").map { |i| i.to_i }
-    ids = @user.can_read_filter(ids)
-    ViewLinkCacheMultiple.perform_async(@user.id, ids)
-    entries = entries_by_id(ids)
-    render json: entries.to_json
+    if params[:ids].respond_to?(:split)
+      ids = params[:ids].split(",").map { |i| i.to_i }
+      ids = @user.can_read_filter(ids)
+      ViewLinkCacheMultiple.perform_async(@user.id, ids)
+      entries = entries_by_id(ids)
+      render json: entries.to_json
+    else
+      head :ok
+    end
   end
 
   def mark_as_read
@@ -191,9 +195,10 @@ class EntriesController < ApplicationController
     @escaped_query = params[:query].tr("\"", "'").html_safe if params[:query]
 
     @saved_search_path = new_saved_search_path(query: params[:query])
-    @entries = Entry.scoped_search(params, @user)
-    @page_query = @entries
-    @total_results = @entries.total
+    result = Entry.scoped_search(params, @user)
+    @entries = result.records(Entry).includes(:feed)
+    @page_query = result.pagination
+    @total_results = result.total
 
     @append = params[:page].present?
 
@@ -203,7 +208,6 @@ class EntriesController < ApplicationController
     @search = true
 
     @search_message = "Mark #{helpers.number_with_delimiter(@total_results)} #{"article".pluralize(@total_results)} that #{"match".pluralize(@total_results == 1 ? 2 : 1)} the search “#{@escaped_query}” as read?"
-
 
     @collection_title = "Search"
 
@@ -260,18 +264,7 @@ class EntriesController < ApplicationController
   end
 
   def matched_search_ids(params)
-    params[:load] = false
-    query = params[:query]
-    entries = Entry.scoped_search(params, @user)
-    ids = entries.results.map(&:id)
-    if entries.total_pages > 1
-      2.upto(entries.total_pages) do |page|
-        params[:page] = page
-        params[:query] = query
-        entries = Entry.scoped_search(params, @user)
-        ids = ids.concat(entries.results.map(&:id))
-      end
-    end
-    ids
+    query = Entry.build_query(user: @user, query: params[:query])
+    Search.client { _1.all_matches(Entry.table_name, query: query) }
   end
 end

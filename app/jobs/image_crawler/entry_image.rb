@@ -16,7 +16,7 @@ module ImageCrawler
 
     def schedule
       if job = build_job
-        FindImage.perform_async(*job)
+        Pipeline::Find.perform_async(job)
       end
     end
 
@@ -26,8 +26,8 @@ module ImageCrawler
       preset_name = "primary"
       if @entry.tweet?
         tweets = []
-        tweets.push(@entry.main_tweet)
-        tweets.push(@entry.main_tweet.quoted_status) if @entry.main_tweet.quoted_status?
+        tweets.push(@entry.tweet.main_tweet)
+        tweets.push(@entry.tweet.main_tweet.quoted_status) if @entry.tweet.main_tweet.quoted_status?
         tweet = tweets.find do |tweet|
           tweet.media?
         end
@@ -41,12 +41,17 @@ module ImageCrawler
       end
 
       if image_urls.present? || entry_url.present?
-        [@entry.public_id, preset_name, image_urls, entry_url]
+        Image.new({
+          id: @entry.public_id,
+          preset_name: preset_name,
+          image_urls: image_urls,
+          entry_url: entry_url
+        }).to_h
       end
     end
 
     def same_domain?
-      entry_host = Addressable::URI.heuristic_parse(@entry.fully_qualified_url).host
+      entry_host = Addressable::URI.heuristic_parse(@entry.fully_qualified_url)&.host
       feed_host = @entry.feed.host
       entry_host == feed_host
     end

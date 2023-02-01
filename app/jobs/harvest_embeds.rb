@@ -15,13 +15,14 @@ class HarvestEmbeds
   def find_embeds(entry_id)
     entry = Entry.find(entry_id)
 
-    want = Nokogiri::HTML5(entry.content).css("iframe").each_with_object([]) do |iframe, array|
-      if match = IframeEmbed::Youtube.recognize_url?(iframe["src"])
+    want = Nokogiri::HTML5(entry.content).css("iframe, a").each_with_object([]) do |element, array|
+      url = element["src"] || element["href"]
+      if match = IframeEmbed::Youtube.recognize_url?(url)
         array.push(match[1])
       end
     end
 
-    video_id = entry.data&.dig("youtube_video_id")
+    video_id = entry.data&.safe_dig("youtube_video_id")
     want.push(video_id) if video_id
 
     add_missing_to_queue(want)
@@ -44,19 +45,20 @@ class HarvestEmbeds
     items = []
 
     videos = youtube_api(type: "videos", ids: ids, parts: ["snippet", "contentDetails"])
-    items.concat(videos.dig("items")&.map { |item, array|
-      Embed.new(data: item, provider_id: item.dig("id"), parent_id: item.dig("snippet", "channelId"), source: :youtube_video)
+    items.concat(videos.safe_dig("items")&.map { |item, array|
+      Embed.new(data: item, provider_id: item.safe_dig("id"), parent_id: item.safe_dig("snippet", "channelId"), source: :youtube_video)
     })
 
-    channel_ids = videos.dig("items")&.map { |video| video.dig("snippet", "channelId") }.uniq
+    channel_ids = videos.safe_dig("items")&.map { |video| video.safe_dig("snippet", "channelId") }.uniq
     channels = youtube_api(type: "channels", ids: channel_ids, parts: ["snippet"])
-    items.concat(channels.dig("items")&.map { |item|
-      Embed.new(data: item, provider_id: item.dig("id"), source: :youtube_channel)
+    items.concat(channels.safe_dig("items")&.map { |item|
+      Embed.new(data: item, provider_id: item.safe_dig("id"), source: :youtube_channel)
     })
 
     Embed.import(items, on_duplicate_key_update: {conflict_target: [:source, :provider_id], columns: [:data]}) if items.present?
 
     update_feed_icons(ids)
+    update_entry_channels(ids)
   end
 
   def update_feed_icons(ids)
@@ -64,7 +66,16 @@ class HarvestEmbeds
     channels = Embed.youtube_channel.where(provider_id: channel_ids).distinct
     channels.each do |channel|
       if feed = Feed.find_by_feed_url("https://www.youtube.com/feeds/videos.xml?channel_id=#{channel.provider_id}")
-        feed.update(custom_icon: channel.data.dig("snippet", "thumbnails", "default", "url"))
+        feed.update(custom_icon: channel.data.safe_dig("snippet", "thumbnails", "default", "url"))
+      end
+    end
+  end
+
+  def update_entry_channels(ids)
+    channel_map = Embed.youtube_video.where(provider_id: ids).pluck(:provider_id, :parent_id).to_h
+    Entry.provider_youtube.where(provider_id: ids).each do |entry|
+      if channel_id = channel_map[entry.provider_id]
+        entry.update(provider_parent_id: channel_id)
       end
     end
   end

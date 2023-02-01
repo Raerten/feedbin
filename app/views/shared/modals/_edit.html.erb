@@ -3,13 +3,7 @@
 <% content_for :modal_title, "", flush: true %>
 
 <% content_for :modal_body, flush: true do %>
-    <div class="entry-inner">
-        <div class="placeholder-content">
-        </div>
-        <div class="spinner-container">
-            <span class="spinner large"></span>
-        </div>
-    </div>
+  <%= render partial: "shared/modal_placeholder" %>
 <% end %>
 
 <% content_for :modal_footer, "", flush: true %>

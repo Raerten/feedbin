@@ -6,6 +6,7 @@ module Search
     sidekiq_options queue: :network_search, retry: false
 
     def perform(entry_id, action_ids, update = false)
+      Sidekiq.logger.info("#{entry_id} actions_ids=#{action_ids}")
       # Looks like [[8, 1, ["mark_read", "star"]], [7, 1, ["mark_read"]]]
       actions = Action.where(id: action_ids).pluck(:id, :user_id, :actions)
       @entry = Entry.find(entry_id)
@@ -24,18 +25,19 @@ module Search
 
         queues.each do |action_name, user_ids|
           user_ids = user_ids.to_a
-          if !update && action_name == "send_push_notification"
-            SafariPushNotificationSend.perform_async(user_ids, entry_id) unless update
-          elsif !update && action_name == "star"
-            star(user_ids, user_actions) unless update
+          if !update && action_name == "star"
+            star(user_ids, user_actions)
           elsif action_name == "mark_read"
+            UnreadEntry.where(user_id: user_ids, entry_id: entry_id).delete_all
             if update
               UpdatedEntry.where(user_id: user_ids, entry_id: entry_id).delete_all
-            else
-              UnreadEntry.where(user_id: user_ids, entry_id: entry_id).delete_all
             end
           elsif !update && action_name == "send_ios_notification"
-            send_ios_notification(user_ids) unless update
+            priority_image_crawl
+            DevicePushNotificationSend.perform_in(1.minute, user_ids, entry_id, true)
+          elsif !update && action_name == "send_push_notification"
+            priority_image_crawl
+            WebPushNotificationSend.perform_in(1.minute, user_ids, entry_id, true)
           end
         end
         Librato.increment "actions_performed", by: 1
@@ -58,13 +60,12 @@ module Search
       end
     end
 
-    def send_ios_notification(user_ids)
+    def priority_image_crawl
       job = ImageCrawler::EntryImage.new
       job.entry = @entry
       if job_args = job.build_job
-        ImageCrawler::FindImageCritical.perform_async(*job_args)
+        ImageCrawler::Pipeline::FindCritical.perform_async(job_args)
       end
-      DevicePushNotificationSend.perform_in(1.minute, user_ids, @entry.id, true)
     end
   end
 end

@@ -29,7 +29,6 @@ Rails.application.configure do
   config.public_file_server.enabled = ENV["RAILS_SERVE_STATIC_FILES"].present?
 
   # Compress CSS using a preprocessor.
-  config.assets.css_compressor = :sass
   config.assets.js_compressor = nil
 
   # Do not fallback to assets pipeline if a precompiled asset is missed.
@@ -75,7 +74,7 @@ Rails.application.configure do
   config.log_tags = [:subdomain, :uuid]
 
   # Use a different cache store in production.
-  config.cache_store = :redis_cache_store, { url: ENV["REDIS_URL_CACHE"] || ENV["REDIS_URL"] }
+  config.cache_store = :redis_cache_store, { url: ENV["REDIS_URL_CACHE"] || ENV["REDIS_URL"], reconnect_attempts: 3 }
 
   # Use a real queuing backend for Active Job (and separate queues per environment).
   # config.active_job.queue_adapter     = :resque

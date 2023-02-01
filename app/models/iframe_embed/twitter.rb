@@ -1,12 +1,18 @@
 class IframeEmbed::Twitter
   attr_reader :url
 
+  def self.download(*args)
+    instance = new(*args)
+    instance.name
+    instance
+  end
+
   def initialize(url)
     @url = url
   end
 
   def name
-    data.dig("author_name")
+    data.safe_dig("author_name")
   end
 
   def screen_name
@@ -14,7 +20,7 @@ class IframeEmbed::Twitter
   end
 
   def permalink
-    data.dig("url")
+    data.safe_dig("url")
   end
 
   def date
@@ -26,11 +32,11 @@ class IframeEmbed::Twitter
   end
 
   def profile_image_url
-    TwitterUser.where("lower(screen_name) = ?", user.downcase).take&.profile_image || ActionController::Base.helpers.image_url("favicon-profile-default.png")
+    TwitterUser.where_lower(screen_name: user).take&.profile_image || ActionController::Base.helpers.image_url("favicon-profile-default.png")
   end
 
   def author_url
-    data.dig("author_url")
+    data.safe_dig("author_url")
   end
 
   def image_url
@@ -61,11 +67,11 @@ class IframeEmbed::Twitter
   OEMBED_URL = "https://publish.twitter.com/oembed"
 
   def user
-    @user ||= data.dig("author_url")&.split("/")&.last
+    @user ||= data.safe_dig("author_url")&.split("/")&.last
   end
 
   def document
-    @document ||= Nokogiri::HTML5.fragment(data.dig("html"))
+    @document ||= Nokogiri::HTML5.fragment(data.safe_dig("html"))
   end
 
   def data

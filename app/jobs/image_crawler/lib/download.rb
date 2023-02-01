@@ -2,10 +2,11 @@ module ImageCrawler
   class Download
     attr_reader :path
 
-    def initialize(url, minimum_size: 20_000)
+    def initialize(url, camo: false, minimum_size: 20_000)
       @url = url
       @valid = false
       @minimum_size = minimum_size
+      @camo = camo
     end
 
     def self.download!(url, **args)
@@ -20,6 +21,7 @@ module ImageCrawler
     end
 
     def download_file(url)
+      url = @camo ? RemoteFile.camo_url(url) : url
       @file = Down.download(url, max_size: 10 * 1024 * 1024, timeout_options: {read_timeout: 20, write_timeout: 5, connect_timeout: 5})
       @path = @file.path
     end
@@ -40,13 +42,27 @@ module ImageCrawler
     end
 
     def persisted_path
-      @persisted_path ||= File.join(Dir.tmpdir, ["image_original_", SecureRandom.hex].join)
+      @persisted_path ||= File.join(Dir.tmpdir, ["image_original_", SecureRandom.hex, ".#{file_extension}"].join)
+    end
+
+    def file_extension
+      content_type = @file.headers["Content-Type"]
+
+      return unless content_type.respond_to?(:start_with?)
+
+      if content_type.start_with?("image/png")
+        "png"
+      elsif content_type.start_with?("image/jpg") || content_type.start_with?("image/jpeg")
+        "jpg"
+      else
+        "unknown"
+      end
     end
 
     def valid?
-      valid = @file && @file.content_type&.start_with?("image")
-      valid &&= @file.size >= @minimum_size unless @minimum_size.nil?
-      valid
+      return false if @file.nil?
+      return true if @minimum_size.nil?
+      @file.size >= @minimum_size
     end
 
     def provider_identifier

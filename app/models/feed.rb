@@ -18,6 +18,7 @@ class Feed < ApplicationRecord
   after_create :refresh_favicon
 
   after_commit :web_sub_subscribe, on: :create
+  after_commit :update_youtube_videos, on: :create
 
   attribute :crawl_data, CrawlDataType.new
   attr_accessor :count, :tags
@@ -27,7 +28,7 @@ class Feed < ApplicationRecord
 
   enum feed_type: {xml: 0, newsletter: 1, twitter: 2, twitter_home: 3, pages: 4}
 
-  store :settings, accessors: [:custom_icon, :current_feed_url, :custom_icon_format], coder: JSON
+  store :settings, accessors: [:custom_icon, :current_feed_url, :custom_icon_format], coder: JsonConverter
 
   def twitter_user?
     twitter_user.present?
@@ -67,18 +68,25 @@ class Feed < ApplicationRecord
     taggings
   end
 
-  def host_letter
-    letter = "default"
-    if host
-      if segment = host.split(".")[-2]
-        letter = segment[0].downcase
-      end
-    end
-    letter
+  def icons
+    {
+      custom_icon                                       => "round",
+      options.safe_dig("image", "url")                  => "square",
+      options.safe_dig("json_feed", "icon")             => "square",
+      options.safe_dig("json_feed", "author", "avatar") => "round",
+    }
   end
 
   def icon
-    options.dig("json_feed", "icon") || custom_icon
+    base = icons.keys.find { !_1.nil? }
+    return nil if base.nil?
+    feed_relative_url(base)
+  end
+
+  def default_icon_format
+    base = icons.keys.find { !_1.nil? }
+    return nil if base.nil?
+    icons[base]
   end
 
   def self.create_from_parsed_feed(parsed_feed)
@@ -90,6 +98,10 @@ class Feed < ApplicationRecord
         unless threader.thread
           new_feed.entries.create_with(entry_hash).create_or_find_by(public_id: entry_hash[:public_id])
         end
+      end
+      # for micropost feeds
+      if parsed_feed.entries.filter_map(&:title).blank?
+        new_feed.update!(custom_icon_format: "round")
       end
     end
   end
@@ -140,7 +152,7 @@ class Feed < ApplicationRecord
   end
 
   def list_unsubscribe
-    options.dig("email_headers", "List-Unsubscribe")
+    options.safe_dig("email_headers", "List-Unsubscribe")
   end
 
   def self.search(url)
@@ -148,7 +160,7 @@ class Feed < ApplicationRecord
   end
 
   def json_feed
-    options&.respond_to?(:dig) && options&.dig("json_feed")
+    options&.respond_to?(:dig) && options&.safe_dig("json_feed")
   end
 
   def has_subscribers?
@@ -216,13 +228,36 @@ class Feed < ApplicationRecord
     "refresher_redirect_stable_%d" % id
   end
 
-  def rebase_url(original_url)
-    base_url = Addressable::URI.heuristic_parse(site_url)
-    original_url = Addressable::URI.heuristic_parse(original_url)
-    Addressable::URI.join(base_url, original_url)
+  def feed_relative_url(url)
+    root = crawl_data.redirected_to || feed_url
+    rebase_url(root, url).to_s
+  end
+
+  def site_relative_url(url)
+    root = site_url
+    rebase_url(root, url).to_s
+  end
+
+  def rebase_url(root, relative)
+    return nil if relative.blank? || !relative.respond_to?(:strip)
+    return relative.strip if relative.strip.downcase.start_with?("http")
+    return nil if root.blank?
+
+    root = Addressable::URI.heuristic_parse(root)
+    relative = Addressable::URI.heuristic_parse(relative)
+    Addressable::URI.join(root, relative)
+  rescue Addressable::URI::InvalidURIError
+    Rails.logger.error("Invalid uri feed=#{id} root=#{root} relative=#{relative}")
+    nil
   end
 
   private
+
+  def update_youtube_videos
+    if youtube_channel_id
+      FeedCrawler::UpdateYoutubeVideos.perform_in(2.minutes, id)
+    end
+  end
 
   def refresh_favicon
     FaviconCrawler::Finder.perform_async(host)

@@ -51,7 +51,7 @@ class EntryPresenter < BasePresenter
 
   def published_date
     if entry.tweet?
-      entry.main_tweet.created_at.to_formatted_s(:full_human)
+      entry.tweet.main_tweet.created_at.to_formatted_s(:full_human)
     else
       if entry.published
         entry.published.to_formatted_s(:full_human)
@@ -63,7 +63,7 @@ class EntryPresenter < BasePresenter
 
   def datetime
     if entry.tweet?
-      entry.main_tweet.created_at.to_formatted_s(:datetime)
+      entry.tweet.main_tweet.created_at.to_formatted_s(:datetime)
     else
       if entry.published
         entry.published.to_formatted_s(:datetime)
@@ -142,7 +142,7 @@ class EntryPresenter < BasePresenter
   end
 
   def newsletter_from
-    from = entry.newsletter_from || entry.data && entry.data.dig("newsletter", "data", "from")
+    from = entry.newsletter_from || entry.data && entry.data.safe_dig("newsletter", "data", "from")
     name, address = from.split(/[<>]/).map(&:strip)
     OpenStruct.new(name: name.delete('"'), address: address)
   rescue
@@ -150,7 +150,11 @@ class EntryPresenter < BasePresenter
   end
 
   def api_content
-    ContentFormatter.api_format(formatted_content, entry)
+    string = ContentFormatter.api_format(formatted_content, entry)
+    if entry.micropost?
+      string = ApplicationController.render template: "entries/_micropost_api", formats: :html, locals: {content: string, entry: entry}, layout: nil
+    end
+    string
   rescue => e
     Rails.logger.info { e.inspect }
     @template.content_tag(:p, "&ndash;&ndash;".html_safe)
@@ -169,7 +173,7 @@ class EntryPresenter < BasePresenter
         ContentFormatter.text_email(entry.content)
       elsif youtube?
         @template.capture do
-          @template.concat @template.content_tag(:iframe, "", width: entry.data["media_width"], height: entry.data["media_height"], src: "https://www.youtube-nocookie.com/embed/#{entry.data["youtube_video_id"]}?rel=0&amp;showinfo=0", frameborder: 0, allowfullscreen: true)
+          @template.concat @template.content_tag(:iframe, "", src: "https://www.youtube-nocookie.com/embed/#{entry.data["youtube_video_id"]}?rel=0&amp;showinfo=0", frameborder: 0, allowfullscreen: true)
           @template.concat ContentFormatter.text_email(entry.content)
         end
       else
@@ -190,12 +194,12 @@ class EntryPresenter < BasePresenter
     if entry.tweet?
       true
     else
-      has_content? && sanitized_title.present?
+      has_content? && title?
     end
   end
 
   def retweet_text
-    HTMLEntities.new.decode(entry.tweet_summary(entry.main_tweet.quoted_status))
+    HTMLEntities.new.decode(entry.tweet.tweet_summary(entry.tweet.main_tweet.quoted_status))
   end
 
   def entry_view_title
@@ -212,11 +216,15 @@ class EntryPresenter < BasePresenter
     @sanitized_title ||= @template.raw(@template.strip_tags(entry.title))
   end
 
+  def title?
+    sanitized_title.present?
+  end
+
   def author
     if entry.author
       clean_author = @template.strip_tags(entry.author)
-    elsif entry.data&.dig("json_feed", "authors").respond_to?(:map)
-      authors = entry.data.dig("json_feed", "authors").map {|a| @template.strip_tags(a["name"]) }
+    elsif entry.data&.safe_dig("json_feed", "authors").respond_to?(:map)
+      authors = entry.data.safe_dig("json_feed", "authors").map {|a| @template.strip_tags(a["name"]) }
       if authors.length > 1
         authors[-1] = "and #{authors[-1]}"
       end
@@ -271,11 +279,11 @@ class EntryPresenter < BasePresenter
       classes.push("media")
     end
 
-    if entry.tweet? || entry.micropost?
+    if entry.tweet? || entry.micropost? || !title?
       classes.push("no-title")
     end
 
-    if entry.retweet?
+    if entry.tweet? && entry.tweet.retweet?
       classes.push("re-tweet")
     end
 
@@ -342,14 +350,11 @@ class EntryPresenter < BasePresenter
   end
 
   def has_enclosure?
-    entry.data.respond_to?(:[]) && entry.data["enclosure_url"].present?
+    enclosure_url.present?
   end
 
   def enclosure_url
-    if has_enclosure?
-      base = Addressable::URI.parse(entry.fully_qualified_url)
-      base.join(entry.data["enclosure_url"]).to_s
-    end
+    entry.rebase_url(entry.data["enclosure_url"])
   rescue
     nil
   end
@@ -464,14 +469,14 @@ class EntryPresenter < BasePresenter
   def profile_image
     if entry.tweet?
       @template.content_tag :span, "", class: "favicon-wrap twitter-profile-image" do
-        url = tweet_profile_image_uri(entry.main_tweet)
+        url = tweet_profile_image_uri(entry.tweet.main_tweet)
         fallback = @template.image_url("favicon-profile-default.png")
         @template.image_tag_with_fallback(fallback, url, alt: "")
       end
     elsif entry.micropost?
       @template.content_tag :span, "", class: "favicon-wrap twitter-profile-image" do
         fallback = @template.image_url("favicon-profile-default.png")
-        url = @template.camo_link(entry.micropost.author_avatar)
+        url = RemoteFile.signed_url(entry.micropost.author_avatar)
         @template.image_tag_with_fallback(fallback, url, alt: "")
       end
     else
@@ -481,13 +486,17 @@ class EntryPresenter < BasePresenter
 
   def summary
     if entry.tweet?
-      text = entry.tweet_summary(nil, true).html_safe
+      text = entry.tweet.tweet_summary(nil, true).html_safe
       summary = @template.truncate(text, length: 280, omission: "", escape: false)
       @template.content_tag(:div, class: "summary light") do
         @template.content_tag(:span, summary)
       end
     elsif entry.micropost?
-      summary = entry.summary.truncate(250, separator: " ", omission: "…")
+      summary = entry.summary
+      if entry.micropost.link_preview?
+        summary = summary.sub(entry.urls.first.to_s, "")
+      end
+      summary = summary.truncate(250, separator: " ", omission: "…")
       @template.content_tag(:div, class: "summary light") do
         @template.content_tag(:span, summary)
       end
@@ -498,8 +507,9 @@ class EntryPresenter < BasePresenter
         @template.concat @template.content_tag(:span, summary, class: "summary-inner")
       end
     else
+      summary = entry.summary.truncate(250, separator: " ", omission: "…")
       @template.content_tag(:div, class: "summary light") do
-        @template.concat @template.content_tag(:span, title, class: "inline-title")
+        @template.content_tag(:span, summary)
       end
     end
   rescue
@@ -510,22 +520,19 @@ class EntryPresenter < BasePresenter
     length = 240
     if entry.tweet?
       @template.content_tag(:span, "", class: "title-inner") do
-        "#{tweet_name(entry.main_tweet)} #{@template.content_tag(:span, tweet_screen_name(entry.main_tweet), class: "light")}".html_safe
+        "#{tweet_name(entry.tweet.main_tweet)} #{@template.content_tag(:span, tweet_screen_name(entry.tweet.main_tweet), class: "light")}".html_safe
       end
     elsif entry.micropost?
       @template.content_tag(:span, "", class: "title-inner") do
         "#{entry.micropost.author_name} #{@template.content_tag(:span, entry.micropost.author_display_username, class: "light")}".html_safe
       end
-    else
-      if sanitized_title.present?
-        text = sanitized_title
-      elsif !entry.summary.blank?
-        text = entry.summary
-      end
-      if text.blank?
-        text = "--".html_safe
-      end
+    elsif title?
+      text = sanitized_title
       @template.truncate(text, length: length, omission: "…", escape: false)
+    else
+      @template.content_tag(:span, "", class: "title-inner", data: {behavior: "user_title", feed_id: entry.feed.id}) do
+        entry.feed.title
+      end
     end
   end
 
@@ -534,18 +541,12 @@ class EntryPresenter < BasePresenter
   end
 
   def feed_title
-    if entry.tweet? || entry.micropost?
+    if entry.tweet? || entry.micropost? || entry.title.blank?
       ""
     elsif entry.feed.pages?
       @template.content_tag(:div, class: "feed-title") do
         @template.content_tag(:span, "", class: "title-inner") do
           entry.hostname
-        end
-      end
-    elsif entry.title.blank? && entry.author.present?
-      @template.content_tag(:div, class: "feed-title") do
-        @template.content_tag(:span, "", class: "title-inner") do
-          entry.author
         end
       end
     else
@@ -569,13 +570,21 @@ class EntryPresenter < BasePresenter
     end
   end
 
-  def title?
-    entry.title.present?
+  def embedded_image
+    return unless data&.safe_dig("media_type") =~ /^image/i
+    return unless data&.safe_dig("media_url") =~ /^http/i
+    @template.camo_link(data&.safe_dig("media_url"))
+  end
+
+  def embedded_video
+    return unless data&.safe_dig("media_type") =~ /^video/i
+    return unless data&.safe_dig("media_url") =~ /^http/i
+    @template.camo_link(data&.safe_dig("media_url"))
   end
 
   def tweet_classes(tweet)
     classes = ["tweet-author-#{tweet.user.id}"]
-    parent = @locals[:parent] || entry.main_tweet
+    parent = @locals[:parent] || entry.tweet.main_tweet
     if @locals[:tweet_counter].present? && tweet.user.id == parent.user.id
       if tweet.in_reply_to_user_id? && tweet.in_reply_to_user_id != parent.user.id && tweet.id != parent.id
         classes.push("tweet-author-reply")
@@ -592,7 +601,7 @@ class EntryPresenter < BasePresenter
   end
 
   def tweet_in_reply_to(tweet)
-    tweet ||= entry.main_tweet
+    tweet ||= entry.tweet.main_tweet
     if tweet.to_h[:display_text_range] && tweet.in_reply_to_status_id?
       range = tweet.to_h[:display_text_range]
       content_start = range.last
@@ -639,8 +648,8 @@ class EntryPresenter < BasePresenter
 
   def all_tweets
     [].tap do |array|
-      array.push(entry.main_tweet)
-      array.push(entry.main_tweet.quoted_status) if entry.main_tweet.quoted_status?
+      array.push(entry.tweet.main_tweet)
+      array.push(entry.tweet.main_tweet.quoted_status) if entry.tweet.main_tweet.quoted_status?
     end
   end
 
@@ -649,8 +658,8 @@ class EntryPresenter < BasePresenter
   end
 
   def tweet_retweeted_image
-    if entry.tweet.user.profile_image_uri? && entry.tweet.user.profile_image_uri_https("normal")
-      @template.camo_link(entry.tweet.user.profile_image_uri_https("normal"))
+    if entry.tweet.user.profile_image_uri? && entry.tweet.user.profile_image_uri_https(:original)
+      RemoteFile.signed_url(entry.tweet.user.profile_image_uri_https(:original))
     else
       @template.image_url("favicon-profile-default.png")
     end
@@ -665,16 +674,16 @@ class EntryPresenter < BasePresenter
   end
 
   # Sizes: normal, bigger
-  def tweet_profile_image_uri(tweet, size = :bigger)
+  def tweet_profile_image_uri(tweet, size = :original)
     if tweet.user.profile_image_uri? && tweet.user.profile_image_uri_https(size)
-      @template.camo_link(tweet.user.profile_image_uri_https(size))
+      RemoteFile.signed_url(tweet.user.profile_image_uri_https(size))
     else
       @template.image_url("favicon-profile-default.png")
     end
   end
 
-  def tweet_youtube_embed(url, tag = :iframe)
-    url = url.expanded_url.to_s
+  def youtube_embed(url, tag = :iframe)
+    url = url.to_s
     if YOUTUBE_URLS.find { |format| url =~ format } && $1
       youtube_id = $1
       iframe_embed("https://www.youtube.com/embed/#{youtube_id}", tag)
@@ -683,8 +692,8 @@ class EntryPresenter < BasePresenter
     end
   end
 
-  def tweet_vimeo_embed(url, tag = :iframe)
-    url = url.expanded_url.to_s
+  def vimeo_embed(url, tag = :iframe)
+    url = url.to_s
     if VIMEO_URLS.find { |format| url =~ format } && $1
       vimeo_id = $1
       iframe_embed("https://player.vimeo.com/video/#{vimeo_id}", tag)
@@ -693,22 +702,8 @@ class EntryPresenter < BasePresenter
     end
   end
 
-  def iframe_embed(url, tag)
-    if tag == :iframe
-      @template.content_tag(:iframe, "", src: url, height: 9, width: 16, frameborder: 0, allowfullscreen: true).html_safe
-    else
-      context = {
-        embed_url: Rails.application.routes.url_helpers.iframe_embeds_path,
-        embed_classes: "iframe-placeholder entry-callout system-content"
-      }
-      filter = HTML::Pipeline::IframeFilter.new("", context)
-      attributes = filter.iframe_attributes(url, 16, 9)
-      @template.content_tag(:div, "", attributes).html_safe
-    end
-  end
-
-  def tweet_instagram_embed(url)
-    url = url.expanded_url.to_s
+  def instagram_embed(url)
+    url = url.to_s
     if INSTAGRAM_URLS.find { |format| url =~ format } && $1
       instagram_id = $1
       @template.content_tag :div, data: {behavior: "entry_content_wrap"} do
@@ -723,6 +718,39 @@ class EntryPresenter < BasePresenter
     end
   end
 
+  def page_content(page)
+    content = begin
+      ContentFormatter.format!(page.content, nil, true, page.url)
+    rescue
+      nil
+    end
+    (content && content.length > 400) ? content : nil
+  end
+
+  def page_content_api(page)
+    ContentFormatter.absolute_source(page.content, nil, page.url)
+    content = begin
+      ContentFormatter.absolute_source(page.content, nil, page.url)
+    rescue
+      nil
+    end
+    (content && content.length > 400) ? content : nil
+  end
+
+  def iframe_embed(url, tag)
+    if tag == :iframe
+      @template.content_tag(:iframe, "", src: url, height: 720, width: 1280, frameborder: 0, allowfullscreen: true).html_safe
+    else
+      context = {
+        embed_url: Rails.application.routes.url_helpers.iframe_embeds_path,
+        embed_classes: "iframe-placeholder entry-callout system-content"
+      }
+      filter = HTML::Pipeline::IframeFilter.new("", context)
+      attributes = filter.iframe_attributes(url, 720, 1280)
+      @template.content_tag(:div, "", attributes).html_safe
+    end
+  end
+
   def tweet_location(tweet)
     tweet.place? ? tweet.place.full_name : nil
   end
@@ -734,8 +762,8 @@ class EntryPresenter < BasePresenter
   def tweet_video(media)
     options = {
       poster: @template.camo_link(media.media_url_https.to_s + ":large"),
-      width: media.video_info.aspect_ratio.first,
-      height: media.video_info.aspect_ratio.last,
+      width: media.sizes[:large].w,
+      height: media.sizes[:large].h,
       preload: "none"
     }
 
@@ -756,7 +784,7 @@ class EntryPresenter < BasePresenter
   end
 
   def tweet_text(tweet, tag = true, options = {})
-    text = entry.tweet_text(tweet, options)
+    text = entry.tweet.tweet_text(tweet, options)
     if text.present?
       if tag
         @template.content_tag(:p, class: "tweet-text") do
@@ -769,7 +797,7 @@ class EntryPresenter < BasePresenter
   end
 
   def tweet_author_description(tweet)
-    entities = tweet.to_h.dig(:user, :entities, :description)
+    entities = tweet.to_h.safe_dig(:user, :entities, :description)
     @template.content_tag(:p, class: "tweet-text") do
       if entities
         Twitter::TwitterText::Autolink.auto_link_usernames_or_lists(Twitter::TwitterText::Autolink.auto_link_with_json(tweet.user.description, entities)).html_safe
@@ -804,32 +832,32 @@ class EntryPresenter < BasePresenter
   end
 
   def quoted_status?
-    entry.main_tweet.quoted_status?
+    entry.tweet.main_tweet.quoted_status?
   end
 
   def quoted_status
-    entry.main_tweet.quoted_status
+    entry.tweet.main_tweet.quoted_status
   end
 
-  def tweet_link_title
-    saved_page(entry.main_tweet.urls.first.expanded_url.to_s)&.title
+  def saved_page_title(url)
+    saved_page(url)&.title
   end
 
-  def tweet_link_host
-    saved_page(entry.main_tweet.urls.first.expanded_url.to_s)&.domain
+  def saved_page_host(url)
+    saved_page(url)&.domain
   end
 
   def quoted_tweet
     return unless quoted_tweet?
     @template.content_tag :div, class: "quoted-tweet light" do
-      @template.concat @template.content_tag(:strong) { tweet_name(entry.main_tweet.quoted_status) }
+      @template.concat @template.content_tag(:strong) { tweet_name(entry.tweet.main_tweet.quoted_status) }
       @template.concat " – "
       @template.concat retweet_text
     end
   end
 
   def quoted_tweet?
-    entry.tweet? && entry.main_tweet.quoted_status?
+    entry.tweet? && entry.tweet.main_tweet.quoted_status?
   end
 
   def feed_wrapper(subscriptions, &block)
