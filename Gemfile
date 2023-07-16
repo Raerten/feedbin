@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 git_source(:github) { |name| "https://github.com/#{name}.git" }
 
-gem "rails", "= 7.0.4.3"
+gem "rails", "= 7.0.6"
 gem "will_paginate"
 
 gem "http",                github: "feedbin/http",                branch: "feedbin"
@@ -9,18 +9,16 @@ gem "carrierwave",         github: "feedbin/carrierwave",         branch: "feedb
 gem "sax-machine",         github: "feedbin/sax-machine",         branch: "feedbin"
 gem "feedjira",            github: "feedbin/feedjira",            branch: "f2"
 gem "feedkit",             github: "feedbin/feedkit",             branch: "master"
-gem "grocer-pushpackager", github: "feedbin/grocer-pushpackager", branch: "feedbin", require: "grocer/pushpackager"
 gem "html-pipeline",       github: "feedbin/html-pipeline",       branch: "feedbin"
 gem "html_diff",           github: "feedbin/html_diff",           ref: "013e1bb"
 gem "twitter",             github: "feedbin/twitter",             branch: "feedbin"
-gem "down",                github: "feedbin/down",                branch: "normalize"
 
 # https://github.com/mikel/mail/issues/1521
 gem "mail", "< 2.8"
 
 gem "activerecord-import"
 gem "addressable", require: "addressable/uri"
-gem "apnotic", github: "ostinelli/apnotic", branch: "master"
+gem "apnotic"
 gem "autoprefixer-rails"
 gem "bcrypt"
 gem "bootsnap", require: false
@@ -28,6 +26,7 @@ gem "clockwork"
 gem "coffee-rails"
 gem "connection_pool"
 gem "dotenv-rails"
+gem "down"
 gem "evernote_oauth"
 gem "fog-aws"
 gem "honeybadger"
@@ -45,6 +44,7 @@ gem "net-http-persistent"
 gem "oauth"
 gem "oauth2"
 gem "pg"
+gem "phlex-rails"
 gem "postmark-rails"
 gem "premailer-rails"
 gem "raindrops"
@@ -53,7 +53,7 @@ gem "redis", "< 5"
 gem "responders"
 gem "reverse_markdown"
 gem "ruby-vips"
-gem "rubyzip"
+gem "rubyzip", require: "zip"
 gem "sanitize"
 gem "sass-rails"
 gem "sidekiq", "= 6.5.7"
@@ -65,7 +65,6 @@ gem "tailwindcss-rails"
 gem "twitter-text"
 gem "uglifier"
 gem "unicorn"
-gem "view_component"
 gem "web-push"
 
 group :development do
@@ -82,8 +81,7 @@ group :development, :test do
   gem "stripe-ruby-mock", github: "feedbin/stripe-ruby-mock", branch: "feedbin", require: "stripe_mock"
   gem "byebug", platforms: [:mri, :mingw, :x64_mingw]
   gem "capybara", github: "teamcapybara/capybara"
-  # Debug currently breaks github actions: https://github.com/ruby/debug/issues/852
-  # gem "debug", ">= 1.0.0"
+  gem "debug"
   gem "faker"
   gem "minitest"
   gem "minitest-stub-const"

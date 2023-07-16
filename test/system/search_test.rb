@@ -6,6 +6,8 @@ class SearchTest < ApplicationSystemTestCase
 
     login_as(@user)
 
+    wait_for_ajax
+
     find("[data-event-identifier-param=toggle-search]").click
 
     wait_for_ajax
@@ -13,6 +15,9 @@ class SearchTest < ApplicationSystemTestCase
     assert find("[data-controller=search-form]").visible?
 
     find("[data-search-token-target~=query]").fill_in with: @feed.title
+
+    wait_for_ajax
+
     find("[data-search-token-index-param='1']").click
 
     wait_for_ajax

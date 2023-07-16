@@ -94,10 +94,7 @@ class Feed < ApplicationRecord
     create_with(record).create_or_find_by!(feed_url: record[:feed_url]).tap do |new_feed|
       parsed_feed.entries.each do |parsed_entry|
         entry_hash = parsed_entry.to_entry
-        threader = Threader.new(entry_hash, new_feed)
-        unless threader.thread
-          new_feed.entries.create_with(entry_hash).create_or_find_by(public_id: entry_hash[:public_id])
-        end
+        new_feed.entries.create_with(entry_hash).create_or_find_by(public_id: entry_hash[:public_id])
       end
       # for micropost feeds
       if parsed_feed.entries.filter_map(&:title).blank?
@@ -143,9 +140,7 @@ class Feed < ApplicationRecord
 
   def priority_refresh(user = nil)
     if twitter_feed?
-      if 10.minutes.ago > updated_at
-        FeedCrawler::TwitterSchedule.new.enqueue_feed(self, user)
-      end
+      return
     else
       FeedCrawler::DownloaderCritical.perform_async(id, feed_url, subscriptions_count, crawl_data.to_h)
     end
@@ -228,6 +223,10 @@ class Feed < ApplicationRecord
     "refresher_redirect_stable_%d" % id
   end
 
+  def site_url
+    feed_relative_url(self[:site_url])
+  end
+
   def feed_relative_url(url)
     root = crawl_data.redirected_to || feed_url
     rebase_url(root, url).to_s
@@ -239,7 +238,7 @@ class Feed < ApplicationRecord
   end
 
   def rebase_url(root, relative)
-    return nil if relative.blank? || !relative.respond_to?(:strip)
+    return root if relative.blank? || !relative.respond_to?(:strip)
     return relative.strip if relative.strip.downcase.start_with?("http")
     return nil if root.blank?
 

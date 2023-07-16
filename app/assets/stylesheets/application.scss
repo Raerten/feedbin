@@ -329,8 +329,10 @@ body {
     -webkit-font-smoothing: antialiased;
     font-smoothing: antialiased;
   }
-  &.native.app {
+  &.app {
     overflow: hidden;
+  }
+  &.native.app {
     display: flex;
   }
   &.touch.app {
@@ -2739,7 +2741,7 @@ $feed-title-width: 115px;
     position: relative;
     @include arrow(
       $x-position:16px,
-      $y-position: 40px,
+      $y-position: 43px,
       $arrow-color: $color-base,
       $shadow-color: $color-arrow-shadow,
       $origin: right
@@ -2785,6 +2787,13 @@ $feed-title-width: 115px;
   }
 }
 
+.entry-button-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-items: stretch;
+}
+
 .entry-button {
   display: flex;
   align-items: center;
@@ -2794,7 +2803,7 @@ $feed-title-width: 115px;
   border: none;
   background: none;
   width: 45px;
-  height: 40px;
+  height: 100%;
   padding: 0;
   position: relative;
   svg {
@@ -3888,7 +3897,7 @@ $feed-title-width: 115px;
 .content-styles img,
 img.responsive {
   max-width: 100%;
-  display: block;
+  display: inline-block;
   height: auto;
   margin: 0 0 10px 0;
   vertical-align: middle;
@@ -4491,7 +4500,6 @@ img.responsive {
   display: flex;
   align-items: center;
   [class^="favicon"] {
-    margin-right: 8px;
     @include fill($color-contrast-400);
   }
   .switch {
