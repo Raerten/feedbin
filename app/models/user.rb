@@ -49,7 +49,9 @@ class User < ApplicationRecord
     :entries_width,
     :billing_issue,
     :podcast_sort_order,
-    :playlist_migration
+    :playlist_migration,
+    :fix_feeds_flag,
+    :fix_feeds_available
 
   has_one :coupon
   has_many :subscriptions, dependent: :delete_all
@@ -57,6 +59,7 @@ class User < ApplicationRecord
   has_many :feeds, through: :subscriptions
   has_many :entries, through: :feeds
   has_many :imports, dependent: :destroy
+  has_many :import_items, through: :imports
   has_many :billing_events, as: :billable, dependent: :delete_all
   has_many :taggings, dependent: :delete_all
   has_many :tags, through: :taggings
@@ -87,6 +90,8 @@ class User < ApplicationRecord
   before_save :strip_email
   before_save :activate_subscriptions
   before_save { reset_auth_token }
+
+  after_create :schedule_trial_jobs
 
   before_create :create_customer, unless: -> { !ENV["STRIPE_API_KEY"] }
   before_create { generate_tokens }
@@ -161,15 +166,24 @@ class User < ApplicationRecord
   end
 
   def schedule_trial_jobs
-    OnboardingMessage.perform_async(id, MarketingMailer.method(:onboarding_1_welcome).name.to_s)
-    OnboardingMessage.perform_in(3.days, id, MarketingMailer.method(:onboarding_2_mobile).name.to_s)
-    OnboardingMessage.perform_in(5.days, id, MarketingMailer.method(:onboarding_3_subscribe).name.to_s)
-    OnboardingMessage.perform_in(Feedbin::Application.config.trial_days.days - 1.days, id, MarketingMailer.method(:onboarding_4_expiring).name.to_s)
-    OnboardingMessage.perform_at(Feedbin::Application.config.trial_days.days.from_now + 1.days, id, MarketingMailer.method(:onboarding_5_expired).name.to_s)
+    # OnboardingMessage.perform_async(id, MarketingMailer.method(:onboarding_1_welcome).name.to_s)
+    # OnboardingMessage.perform_in(3.days, id, MarketingMailer.method(:onboarding_2_mobile).name.to_s)
+    # OnboardingMessage.perform_in(5.days, id, MarketingMailer.method(:onboarding_3_subscribe).name.to_s)
+    # OnboardingMessage.perform_in(Feedbin::Application.config.trial_days.days - 1.days, id, MarketingMailer.method(:onboarding_4_expiring).name.to_s)
+    # OnboardingMessage.perform_at(Feedbin::Application.config.trial_days.days.from_now + 1.days, id, MarketingMailer.method(:onboarding_5_expired).name.to_s)
+    TrialSendExpiration.perform_in(Feedbin::Application.config.trial_days.days - 1.days, id)
   end
 
   def setting_on?(setting_symbol)
     send(setting_symbol) == "1"
+  end
+
+  def setting_on!(setting_symbol)
+    update(setting_symbol => "1")
+  end
+
+  def setting_off!(setting_symbol)
+    update(setting_symbol => "0")
   end
 
   def subscribed_to_emails?
