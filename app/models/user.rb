@@ -123,13 +123,14 @@ class User < ApplicationRecord
   end
 
   def theme
-    if settings
+    preference = if settings
       if settings["theme"] == "night"
         "dusk"
       else
         settings["theme"]
       end
     end
+    preference.present? ? preference : "day"
   end
 
   def twitter_enabled?
@@ -304,7 +305,7 @@ class User < ApplicationRecord
     token = generate_token(:password_reset_token, nil, true)
     self.password_reset_sent_at = Time.now
     save!
-    UserMailer.delay(queue: :default_critical).password_reset(id, token)
+    UserMailer.password_reset(id, token).deliver_later
   end
 
   def create_customer
