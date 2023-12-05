@@ -6,7 +6,7 @@ class FeedFixer
   def perform(feed_id, force = false)
     @feed = Feed.find(feed_id)
 
-    return unless @feed.crawl_error?
+    return unless @feed.fixable_error?
 
     if !force && recent_discovery_exists?
       Sidekiq.logger.info "Skipping discovery, already checked recently feed=#{@feed.id} url=#{@feed.feed_url}"
@@ -19,6 +19,8 @@ class FeedFixer
 
     urls = begin
       FeedFinder.new(@feed.site_url).find_options
+    rescue
+      []
     end
 
     existing = @feed.subscriptions.where.not(fix_status: Subscription.fix_statuses[:none])
@@ -92,7 +94,7 @@ class FeedFixer
 
       jobs = Feed.xml
         .where(id: active)
-        .select { _1.crawl_error? }
+        .select { _1.fixable_error? }
         .map { [_1.id] }
 
         Sidekiq::Client.push_bulk(

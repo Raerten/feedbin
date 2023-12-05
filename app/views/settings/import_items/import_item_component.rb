@@ -7,13 +7,13 @@ module Settings
       end
 
       def template
-        div class: "opacity-100 transition", id: helpers.dom_id(@import_item, :fixable) do
-          render Settings::ExpandableComponent.new class: "mb-4", data: { capsule: "true" } do |expandable|
-            expandable.description do
-              div class: "p-4" do
-                if helpers.current_user.setting_on?(:fix_feeds_flag) && @import_item.discovered_feeds.present?
-                  render FixFeeds::SuggestionComponent.new(replaceable: @import_item, source: @import_item, redirect: helpers.fix_feeds_url)
-                else
+        render App::ExpandableContainerComponent.new(open: true) do |expandable|
+          expandable.content do
+            div class: "border rounded-lg mb-4 px-4 pb-4" do
+              if helpers.current_user.setting_on?(:fix_feeds_flag) && @import_item.discovered_feeds.present?
+                render FixFeeds::SuggestionComponent.new(replaceable: @import_item, source: @import_item, redirect: helpers.fix_feeds_url)
+              else
+                div class: "pt-4" do
                   render App::FeedComponent do |feed|
                     feed.icon do
                       helpers.favicon_with_record(@import_item.favicon, host: @import_item.host, generated: true)
@@ -27,7 +27,7 @@ module Settings
                       end
                     end
                     feed.accessory do
-                      span(class: "text-red-600") { @import_item.human_error }
+                      span(class: "text-red-600") { @import_item.crawl_error_message }
                     end
                   end
                 end
