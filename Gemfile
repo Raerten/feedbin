@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 git_source(:github) { |name| "https://github.com/#{name}.git" }
 
-gem "rails", "7.1.3"
+gem "rails", "7.1.3.2"
 gem "will_paginate"
 
 gem "http",                github: "feedbin/http",                branch: "feedbin"
@@ -25,7 +25,7 @@ gem "bootsnap", require: false
 gem "clockwork"
 gem "coffee-rails"
 gem "connection_pool"
-gem "dotenv"
+gem "dotenv-rails"
 gem "down"
 gem "evernote_oauth"
 gem "fog-aws"
