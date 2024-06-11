@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 git_source(:github) { |name| "https://github.com/#{name}.git" }
 
-gem "rails", "7.1.3.2"
+gem "rails", "7.1.3.4"
 gem "will_paginate"
 
 gem "http",                github: "feedbin/http",                branch: "feedbin"
@@ -25,7 +25,7 @@ gem "bootsnap", require: false
 gem "clockwork"
 gem "coffee-rails"
 gem "connection_pool"
-gem "dotenv-rails"
+gem "dotenv-rails", "= 2.8.1"
 gem "down"
 gem "evernote_oauth"
 gem "fog-aws"
@@ -68,6 +68,7 @@ gem "twitter-text"
 gem "uglifier"
 gem "unicorn"
 gem "web-push"
+gem "autotuner"
 
 group :development do
   gem "benchmark-ips"
@@ -77,6 +78,8 @@ group :development do
   gem "listen"
   gem "foreman"
   gem "pry"
+  gem "guard"
+  gem "guard-minitest"
 end
 
 group :development, :test do
@@ -93,5 +96,6 @@ group :development, :test do
   gem "selenium-webdriver"
   gem "standard"
   gem "webmock", "= 3.8.0"
+  gem "phlex-testing-nokogiri"
 end
 
