@@ -1136,6 +1136,45 @@ $hamburger-dot: 4px;
       .tag-link .favicon-wrap {
         display: none;
       }
+      .source-menu {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        margin: 0;
+        overflow: visible;
+        width: 35px;
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        padding-right: 16px;
+        @include fill($color-contrast-500);
+        display: none;
+      }
+      a:has(.source-menu):hover {
+        .source-menu {
+          display: flex;
+          .touch & {
+            display: none;
+          }
+        }
+        .count-wrap {
+          visibility: hidden;
+          .touch & {
+            visibility: visible;
+          }
+        }
+      }
+      a.showing-source-menu {
+        .source-menu {
+          display: flex;
+        }
+        .count-wrap {
+          visibility: hidden;
+        }
+      }
       .feed-action-form {
         padding: 0;
         margin: 0;
@@ -1168,6 +1207,9 @@ $hamburger-dot: 4px;
       &.selected {
         .feed-action-clear {
           @include color(white);
+        }
+        > a .source-menu {
+          @include fill(white);
         }
         .clear-form {
           display: block;
@@ -1348,6 +1390,7 @@ $hamburger-dot: 4px;
         line-height: 1;
         display: flex;
         align-items: center;
+        padding-right: 16px;
       }
       .collection-label {
         display: block;
@@ -1357,6 +1400,30 @@ $hamburger-dot: 4px;
         white-space: nowrap;
         &.hide {
           display: none;
+        }
+      }
+    }
+    .muted-icon {
+      @include fill($color-contrast-500)
+      display: none;
+    }
+    &.muted-source {
+      .link-inner {
+        @include color($color-contrast-500);
+      }
+      .muted-icon {
+        display: block;
+      }
+      .count {
+        display: none;
+      }
+      .favicon-wrap * {
+        filter: grayscale(100%);
+        opacity: 0.7;
+      }
+      &.selected {
+        .muted-icon {
+          fill: white;
         }
       }
     }
@@ -2077,6 +2144,10 @@ $feed-title-width: 115px;
   @include border-bottom($color-borders);
   transition: transform 0.2s ease;
   transform: translate3d(0, 0, 0);
+  .feature-flag-floaty-true & {
+    @include border($color-borders, $root: true);
+    border-radius: 8px;
+  }
   &.animate {
     transform: translate3d(0, 0, 0);
   }
@@ -2245,6 +2316,10 @@ $feed-title-width: 115px;
   align-items: center;
   justify-content: center;
   padding: 0 8px;
+}
+
+.source-menu-container {
+  width: 180px;
 }
 
 .format-palette {
@@ -2464,7 +2539,15 @@ $feed-title-width: 115px;
   .has-content & {
     display: block;
   }
+  .feature-flag-floaty-true & {
+    max-width: 700px;
+    margin: 16px auto 0 auto;
+    width: 100%;
+    padding: 0 16px;
+  }
 }
+
+
 
 .entry-content-wrap {
   z-index: 0;
@@ -2834,18 +2917,16 @@ $feed-title-width: 115px;
   }
 }
 
-.dropdown-wrap {
-  position: relative;
-  .dropdown-content {
-    display: none;
-    width: 232px;
-    border-radius: 8px;
-    @include background-color($color-base-alt);
-    @include border($color-borders);
-    box-shadow: $box-shadow-dropdown;
-    position: absolute;
-    z-index: 10000;
-  }
+.dropdown-content {
+  display: none;
+  width: 232px;
+  border-radius: 8px;
+  @include background-color($color-base-alt);
+  @include border($color-borders);
+  box-shadow: $box-shadow-dropdown;
+  position: absolute;
+  z-index: 10000;
+
   ul {
     margin: 0;
     padding: base-units(0.5) 0;
@@ -2988,6 +3069,24 @@ $feed-title-width: 115px;
       }
     }
   }
+  .share-option a {
+    display: flex;
+    align-items: baseline;
+  }
+  .share-keyboard {
+    @include font-size(12);
+    margin-left: auto;
+    font-style: normal;
+    margin-top: 2px;
+    @include color($color-contrast-500);
+  }
+  .share-option a:hover .share-keyboard {
+    @include color($color-contrast-700);
+  }
+}
+
+.dropdown-wrap {
+  position: relative;
   &.open {
     .dropdown-content {
       display: block;
@@ -3002,20 +3101,6 @@ $feed-title-width: 115px;
     .dropdown-content {
       left: 0 !important;
     }
-  }
-  .share-option a {
-    display: flex;
-    align-items: baseline;
-  }
-  .share-keyboard {
-    @include font-size(12);
-    margin-left: auto;
-    font-style: normal;
-    margin-top: 2px;
-    @include color($color-contrast-500);
-  }
-  .share-option a:hover .share-keyboard {
-    @include color($color-contrast-700);
   }
 }
 
