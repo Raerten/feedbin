@@ -29,15 +29,15 @@ $.extend feedbin,
   remoteContentIntervals: {}
   fastAnimation: 200
 
-  toggleItemInArray: (array, item) ->
-    index = array.indexOf(item)
+  updateStyles: (url) ->
+    element = $("link[href='#{url}']")
 
-    if index isnt -1
-      array.splice(index, 1)
-    else
-      array.push(item)
-
-    array
+    if element.length == 0
+      tag = $("<link />").attr(
+        href: url
+        rel: "stylesheet"
+      )
+      $('head').append(tag)
 
   sharedMarkRead: ->
     unless $(@).attr('disabled')
@@ -670,13 +670,6 @@ $.extend feedbin,
     $.each feedbin.data.muted_feeds, (index, feedId) ->
       $("[data-feed-id=#{feedId}]").addClass(cssClass)
 
-  updateFeeds: (feeds, digest) ->
-    if feedbin.feedsDigest != digest
-      feedbin.feedsDigest = digest
-      $('[data-behavior~=feeds_target]').html(feeds)
-    else
-      false
-
   clearEntries: ->
     $('[data-behavior~=entries_target]').html('')
 
@@ -1038,7 +1031,7 @@ $.extend feedbin,
 
   refresh: ->
     if feedbin.data
-      $.get(feedbin.data.auto_update_path)
+      $.get(feedbin.data.auto_update_path, {feed_digest: feedbin.feedsDigest})
 
   shareOpen: ->
     $('[data-behavior~=toggle_share_menu]').parents('.dropdown-wrap').hasClass('open')
@@ -1832,6 +1825,11 @@ $.extend feedbin,
         nextScreenshot.find('a')[0]?.click()
         event.preventDefault()
         return
+
+    sourceable: ->
+      $(document).on 'click', '[data-sourceable-payload-param]', (event) ->
+        custom = new CustomEvent("sourceable:selected", {detail: {data: $(@).data("sourceablePayloadParam"), target: event.currentTarget}})
+        window.dispatchEvent(custom)
 
     entriesLoading: ->
       $(document).on 'click', '[data-behavior~=feed_link]', (event) ->
