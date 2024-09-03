@@ -28,6 +28,7 @@ $.extend feedbin,
   loadingMore: false
   remoteContentIntervals: {}
   fastAnimation: 200
+  hideToolbarClass: "hide-entry-toolbar"
 
   updateStyles: (url) ->
     element = $("link[href='#{url}']")
@@ -604,6 +605,7 @@ $.extend feedbin,
 
   animateEntryContent: (content) ->
     innerContent = $('[data-behavior~=inner_content_target]')
+    $('.entry-content').removeClass('current')
 
     if $(feedbin.selectedEntry.container.closest("li")).isAfter(feedbin.previousEntry.container.closest("li"))
       next = $('<div class="next-entry load-next-entry"></div>')
@@ -615,6 +617,7 @@ $.extend feedbin,
     $('.entry-toolbar').addClass("animate")
 
     next.html(content)
+    $('.entry-content', next).addClass('current')
 
     next.insertAfter(innerContent)
 
@@ -1031,7 +1034,7 @@ $.extend feedbin,
 
   refresh: ->
     if feedbin.data
-      $.get(feedbin.data.auto_update_path, {feed_digest: feedbin.feedsDigest})
+      $.get(feedbin.data.auto_update_path, {subscriptions_hash: feedbin.data.subscriptions_hash})
 
   shareOpen: ->
     $('[data-behavior~=toggle_share_menu]').parents('.dropdown-wrap').hasClass('open')
@@ -1268,10 +1271,44 @@ $.extend feedbin,
       "top": "#{newTop}px"
     selectedPanel.prop('scrollTop', 0)
     $('body').addClass('has-entry-basement')
+    $('body').removeClass(feedbin.hideToolbarClass)
 
   applyStarred: (entryId) ->
     if feedbin.Counts.get().isStarred(entryId)
       $('[data-behavior~=selected_entry_data]').addClass('starred')
+
+  entryScroll: ->
+    lastScrollPosition = 0
+
+    $(".entry-meta").addClass("no-transition")
+    $("body").removeClass(feedbin.hideToolbarClass)
+    callback = ->
+      $(".entry-meta").removeClass("no-transition")
+    setTimeout callback, 200
+
+    scrolled = (element) ->
+      maxScrollHeight = $(element).prop('scrollHeight') - $(element).prop('offsetHeight')
+      currentScrollPosition = $(element).prop('scrollTop')
+
+      if feedbin.shareOpen()
+        $("body").removeClass(feedbin.hideToolbarClass)
+      else if maxScrollHeight < $('.entry-meta').outerHeight()
+        $("body").removeClass(feedbin.hideToolbarClass)
+      else if currentScrollPosition <= 0
+        $("body").removeClass(feedbin.hideToolbarClass)
+      else if currentScrollPosition >= maxScrollHeight
+        $("body").addClass(feedbin.hideToolbarClass)
+      else if currentScrollPosition > lastScrollPosition
+        $("body").addClass(feedbin.hideToolbarClass)
+      else if currentScrollPosition < lastScrollPosition
+        $("body").removeClass(feedbin.hideToolbarClass)
+
+      lastScrollPosition = currentScrollPosition
+
+    $('.feature-flag-floaty-true .entry-content').off 'scroll'
+
+    $('.feature-flag-floaty-true .entry-content.current').on 'scroll', (event) ->
+      scrolled(@)
 
   showEntry: (entryId) ->
     try
@@ -1279,6 +1316,7 @@ $.extend feedbin,
       $('body').removeClass('extract-active')
       feedbin.updateEntryContent(entry.content, entry.inner_content)
       feedbin.formatEntryContent(entryId, true)
+      feedbin.entryScroll()
       if feedbin.viewType == 'updated'
         $('[data-behavior~=change_content_view][data-view-mode=diff]').prop('checked', true).change()
       else if feedbin.data.subscription_view_mode[entry.feed_id] == "newsletter"
@@ -1505,9 +1543,20 @@ $.extend feedbin,
 
   linkActions: {}
 
+  lastMouseY: null
+
   ONE_HOUR: 60 * 60 * 1000
 
   ONE_DAY: 60 * 60 * 1000 * 24
+
+  mouseMovingTowardsTop: (event, threshold = 50) ->
+    if !feedbin.lastMouseY
+      feedbin.lastMouseY = event.clientY
+      return false
+    movingTowardsTop = event.clientY < feedbin.lastMouseY
+    closeToTop = event.clientY < threshold
+    feedbin.lastMouseY = event.clientY
+    return movingTowardsTop && closeToTop
 
 $.extend feedbin,
   preInit:
@@ -2859,6 +2908,17 @@ $.extend feedbin,
             if 'console' of window
               console.log error
         event.preventDefault()
+
+    hideToolbarBehavior:  ->
+      $(document).on 'mousemove', '.entry-column', (event) ->
+        if $('body').hasClass(feedbin.hideToolbarClass) && feedbin.mouseMovingTowardsTop(event, 150)
+          $('body').removeClass(feedbin.hideToolbarClass)
+
+      $(document).on 'click', '.entry-content', (event) ->
+        $('body').removeClass(feedbin.hideToolbarClass)
+
+      $(document).on 'click', '[data-behavior~=toggle_share_menu]', (event) ->
+        $('body').removeClass(feedbin.hideToolbarClass)
 
 
 $.each feedbin.preInit, (i, item) ->

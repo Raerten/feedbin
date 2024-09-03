@@ -30,12 +30,14 @@ module FeedCrawler
         request(auto_inflate: false)
       end
 
+      content_changed = !@response.not_modified?(@crawl_data.download_fingerprint)
+
+      Sidekiq.logger.info "Downloaded content_changed=#{content_changed} http_status=\"#{@response.status}\" url=#{@feed_url}"
+
       @crawl_data.download_success(@feed_id)
+      @crawl_data.save(@response)
 
-      modified = !@response.not_modified?(@crawl_data.download_fingerprint)
-      Sidekiq.logger.info "Downloaded modified=#{modified} http_status=\"#{@response.status}\" url=#{@feed_url} ignore_http_caching=#{@crawl_data.ignore_http_caching?}"
-
-      parse if modified
+      parse if content_changed
     rescue ConcurrencyLimit::TimeoutError => exception
       Sidekiq.logger.info "Download timed out url=#{@feed_url} exception=#{exception.inspect}"
     rescue Feedkit::Error => exception
@@ -57,8 +59,8 @@ module FeedCrawler
           on_redirect:   on_redirect,
           username:      parsed_url.username,
           password:      parsed_url.password,
-          last_modified: ignore_http_caching? ? nil : @crawl_data.last_modified,
-          etag:          ignore_http_caching? ? nil : @crawl_data.etag,
+          last_modified: @crawl_data.last_modified,
+          etag:          @crawl_data.etag,
           auto_inflate:  auto_inflate,
           user_agent:    "Feedbin feed-id:#{@feed_id} - #{@subscribers} subscribers"
         )
@@ -74,7 +76,6 @@ module FeedCrawler
     def parse
       @parsing = true
       @response.persist!
-      @crawl_data.save(@response)
       job_class = critical ? ParserCritical : Parser
       job_id = job_class.perform_async(@feed_id, @response.path, @response.encoding.to_s, @crawl_data.to_h)
       Sidekiq.logger.info "Parse enqueued job_id=#{job_id} path=#{@response.path}"
@@ -85,10 +86,6 @@ module FeedCrawler
         id: @feed_id,
         crawl_data: @crawl_data.to_h
       }.to_json)
-    end
-
-    def ignore_http_caching?
-      critical
     end
   end
 end
