@@ -49,10 +49,12 @@ class User < ApplicationRecord
     :entries_width,
     :billing_issue,
     :podcast_sort_order,
+    :podcast_download_limit,
     :playlist_migration,
     :fix_feeds_available,
     :addresses_available,
-    :floaty
+    :floaty,
+    :feed_search
 
   has_one :coupon
   has_many :subscriptions, dependent: :delete_all
