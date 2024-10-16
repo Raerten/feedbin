@@ -8,11 +8,15 @@ class NewsletterReceiver
     @url = Addressable::URI.parse(url)
     @user = original_authentication_token&.user
 
+    Sidekiq.logger.info "Newsletter processing user_id=#{@user&.id} address=#{address} url=#{url}"
+
     if @user && full_authentication_token&.active?
       @newsletter = parse_newsletter
       if entry = create
         Sidekiq.logger.info "Newsletter created public_id=#{entry.public_id}"
       end
+    else
+      Sidekiq.logger.info "Newsletter skipped user_id=#{@user&.id} address=#{address} url=#{url}"
     end
     storage_client.delete_object(@url.host, storage_path)
   end
