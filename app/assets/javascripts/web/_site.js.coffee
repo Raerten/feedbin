@@ -333,16 +333,6 @@ $.extend feedbin,
       if result && "matches" of result
         result.matches == true
 
-  setThemeColor: ->
-    color = feedbin.colorForSection("body")
-    $('meta[name=theme-color]').attr("content", color)
-    if feedbin.darkMode()
-      $('body').removeClass("prefers-light")
-      $('body').addClass("prefers-dark")
-    else
-      $('body').removeClass("prefers-dark")
-      $('body').addClass("prefers-light")
-
   colorForSection: (section, overlay = false) ->
     color = $("[data-theme-#{section}]").css("backgroundColor")
     if overlay
@@ -510,6 +500,9 @@ $.extend feedbin,
     feedbin.swipe && $('body').hasClass('has-offscreen-panels')
 
   showPanel: (panel, state = true) ->
+    if !$('body').hasClass('app')
+      return
+
     feedbin.panel = panel
     if panel == 1
       if state && feedbin.mobileView()
@@ -2230,7 +2223,6 @@ $.extend feedbin,
         $('[data-behavior~=class_target]').removeClass('theme-auto')
         $('[data-behavior~=class_target]').addClass("theme-#{theme}")
         feedbin.theme = theme
-        feedbin.setThemeColor()
 
     titleBarColor: ->
       feedbin.setNativeTheme()
@@ -2768,10 +2760,8 @@ $.extend feedbin,
         $(@).tooltip('hide')
 
     colorSchemePreference: ->
-      feedbin.setThemeColor()
       darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
       darkModeMediaQuery.addListener (event) ->
-        feedbin.setThemeColor()
         setTimeout feedbin.setNativeTheme, 300
 
     visibilitychange: ->
