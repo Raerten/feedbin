@@ -30,7 +30,7 @@ module Dialog
             form_for(@saved_search, remote: true, method: @saved_search.persisted? ? :patch : :post, html: {data: {behavior: "close_dialog_on_submit"}}) do |form_builder|
               div class: "mb-4" do
                 render Form::TextInputComponent.new do |text|
-                  text.label do
+                  text.label_content do
                     form_builder.label :name, "Name"
                   end
                   text.input do
@@ -40,7 +40,7 @@ module Dialog
               end
 
               render Form::TextInputComponent.new do |text|
-                text.label do
+                text.label_content do
                   form_builder.label :query, "Query"
                 end
                 text.input do
@@ -51,15 +51,14 @@ module Dialog
           end
         end
         dialog.footer do
-          div class: "flex items-center animate-fade-in" do
+          render Dialog::Template::FooterControls.new do
             if @saved_search.persisted?
-              link_to saved_search_path(@saved_search), method: :delete, remote: true, class: "!text-600 button-text text-sm flex items-center gap-2", data: { behavior: "close_dialog",confirm: "Are you sure you want to delete this search?" } do
-                render SvgComponent.new("icon-delete", class: "fill-600")
+              link_to saved_search_path(@saved_search), method: :delete, remote: true, class: "dialog-button-secondary", data: { behavior: "close_dialog",confirm: "Are you sure you want to delete this search?" } do
                 plain " Delete"
               end
             end
 
-            button type: "submit", class: "button ml-auto", value: "save", form: helpers.dom_id(@saved_search, @saved_search.persisted? ? :edit : :new) do
+            button type: "submit", class: "dialog-button-primary", value: "save", form: dom_id(@saved_search, @saved_search.persisted? ? :edit : :new) do
               "Save"
             end
           end

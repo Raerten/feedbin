@@ -64,7 +64,8 @@ gem "stringio"
 gem "stripe", "~> 5.55.0"
 gem "stripe_event"
 gem "strong_migrations", "< 2"
-gem "tailwindcss-rails"
+gem "tailwindcss-ruby", "< 4"
+gem "tailwindcss-rails", "< 4"
 gem "twitter-text"
 gem "uglifier"
 gem "unicorn"
@@ -97,6 +98,6 @@ group :development, :test do
   gem "selenium-webdriver"
   gem "standard"
   gem "webmock"
-  gem "phlex-testing-nokogiri"
+  # gem "phlex-testing-nokogiri"
 end
 

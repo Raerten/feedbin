@@ -22,6 +22,9 @@ export default class extends Controller {
     // Add scroll event listener for snapContainer
     this.boundCheckSnapScroll = this.checkSnapScroll.bind(this)
     this.snapContainerTarget.addEventListener("scroll", this.boundCheckSnapScroll)
+
+    this.clickOrigin = null
+    this.dialogOpen = false
   }
 
   disconnect() {
@@ -48,6 +51,10 @@ export default class extends Controller {
     let element = document.createElement("div")
     element.innerHTML = event.detail.data
 
+    if (!this.dialogOpen) {
+      return
+    }
+
     this.open(element, event.detail.dialog_id, true)
   }
 
@@ -70,9 +77,10 @@ export default class extends Controller {
       })
     }
 
-    this.dispatch("show")
     this.closingValue = false
+    this.dialogOpen = true
     this.dialogTarget.showModal()
+    this.dispatch("show")
 
     // scroll to end of snapContainer to skip
     // blank container above, seems to only matter in Chrome
@@ -92,6 +100,7 @@ export default class extends Controller {
   close(event = {}, now = false) {
     this.dispatch("willHide")
     this.closingValue = true
+    this.dialogOpen = false
 
     const callback = () => {
       this.dialogTarget.close()
@@ -110,10 +119,15 @@ export default class extends Controller {
     this.close();
   }
 
-  clickOutside(event) {
-    if (event.target === this.dialogTarget) {
+  closeStart(event) {
+    this.clickOrigin = event.target
+  }
+
+  closeEnd(event) {
+    if (event.target === this.dialogTarget && this.clickOrigin === this.dialogTarget) {
       this.close()
     }
+    this.clickOrigin = null
   }
 
   delayedCheckScroll() {
@@ -125,7 +139,7 @@ export default class extends Controller {
   }
 
   checkSnapScroll() {
-    // autoclose if snapContainer below 5% of the height
+    // autoclose if snapContainer below 1% of the height
     const scrollTop = this.snapContainerTarget.scrollTop
     const scrollHeight = this.snapContainerTarget.scrollHeight
     const threshold = scrollHeight * 0.01

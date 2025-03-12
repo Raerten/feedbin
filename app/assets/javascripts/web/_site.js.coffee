@@ -659,7 +659,7 @@ $.extend feedbin,
 
   syntaxHighlight: ->
     $('[data-behavior~=entry_content_target] pre code').each (i, e) ->
-      hljs.highlightBlock(e)
+      hljs.highlightElement(e);
 
   audioVideo: (selector = "entry_final_content") ->
     $("[data-behavior~=#{selector}] audio").each ->
@@ -986,7 +986,7 @@ $.extend feedbin,
         feedbin.footnotes()
 
       animate = feedbin.animateScroll() && $('body').hasClass('one-up')
-      delay = if animate then feedbin.fastAnimation else 0
+      delay = if animate then 250 else 0
       setTimeout callback, delay
 
     catch error
@@ -2730,10 +2730,6 @@ $.extend feedbin,
             if 'console' of window
               console.log error
         event.preventDefault()
-
-    dialogShow: ->
-      $(window).on 'dialog:show', (event) ->
-        feedbin.faviconColors($("dialog"))
 
     openDialog: ->
       $(document).on 'click', '[data-open-dialog]', (event) ->

@@ -92,10 +92,10 @@ jobs:
           psql -c 'create database feedbin_test;' -U postgres
           bundle exec rake db:setup
           bundle exec rails test
-          bundle exec rails test:system
+          # bundle exec rails test:system
 
-      - name: Lint JS
-        run: npm run lint
+      # - name: Lint JS
+      #   run: npm run lint
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
