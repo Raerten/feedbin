@@ -3,6 +3,8 @@ module FaviconCrawler
     include Sidekiq::Worker
     sidekiq_options retry: false
 
+    ICON_NAMES = ["shortcut icon", "icon", "apple-touch-icon", "apple-touch-icon-precomposed"]
+
     def perform(host, force = false)
       @favicon = Favicon.unscoped.where(host: host).first_or_initialize
       @force = force
@@ -54,13 +56,29 @@ module FaviconCrawler
       homepage = download_homepage
       html = Nokogiri::HTML5(homepage)
       favicon_links = html.search(xpath)
+
+      favicon_links = favicon_links.reject {
+        it["href"].to_s.strip.empty?
+      }
+      .sort_by {
+        -(it["sizes"] ? it["sizes"].scan(/\d+/).first.to_i : 0)
+      }
+      .sort_by {
+        it["media"] && it["media"].include?("dark") ? 1 : 0
+      }
+      .sort_by {
+        rel = it["rel"].to_s.strip.downcase
+        index = ICON_NAMES.index(rel)
+        index.nil? ? ICON_NAMES.length : index
+      }
+
       if favicon_links.present?
-        favicon_url = favicon_links.first.to_s
+        favicon_url = favicon_links.first["href"]
         favicon_url = URI.parse(favicon_url)
         favicon_url.scheme = "http"
         unless favicon_url.host
           favicon_url = URI::HTTP.build(scheme: "http", host: @favicon.host)
-          favicon_url = favicon_url.merge(favicon_links.last.to_s)
+          favicon_url = favicon_url.merge(favicon_links.first["href"])
         end
       end
       favicon_url
@@ -106,9 +124,8 @@ module FaviconCrawler
     end
 
     def xpath
-      icon_names = ["shortcut icon", "icon", "apple-touch-icon", "apple-touch-icon-precomposed"]
-      icon_names = icon_names.map { |icon_name|
-        "//link[not(@mask) and translate(@rel, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz') = '#{icon_name}']/@href"
+      icon_names = ICON_NAMES.map { |icon_name|
+        "//link[not(@mask) and translate(@rel, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz') = '#{icon_name}']"
       }
       icon_names.join(" | ")
     end
