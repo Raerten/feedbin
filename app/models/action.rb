@@ -2,7 +2,7 @@ class Action < ApplicationRecord
   attr_accessor :automatic_modification, :apply_action
 
   belongs_to :user
-  enum :action_type, {standard: 0, notifier: 1}
+  enum :action_type, {standard: 0, notifier: 1, mute: 2}
   enum :status, {active: 0, suspended: 1, broken: 2}
 
   validate do |action|
@@ -15,6 +15,7 @@ class Action < ApplicationRecord
   before_validation :compute_feed_ids
 
   validate :query_valid, unless: :automatic_modification
+  validates :query, presence: true, if: -> { mute? }
 
   after_destroy :percolate_destroy
   after_commit :percolate_create, on: [:create, :update]

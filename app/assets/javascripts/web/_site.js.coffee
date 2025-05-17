@@ -511,6 +511,11 @@ $.extend feedbin,
       if feedbin.animateScroll()
         feedbin.scrollToPanel('.entry-column')
 
+  sanitize: (text) ->
+    decoded = document.createElement('textarea')
+    decoded.innerHTML = text
+    decoded.value
+
   hideNotification: (animated = true) ->
     container = $('[data-behavior~=notification_container]')
     if animated
@@ -526,6 +531,7 @@ $.extend feedbin,
 
   showNotification: (text, error = false, url = null) ->
     clearTimeout(feedbin.notificationTimeout)
+    text = feedbin.sanitize(text)
 
     container = $('[data-behavior~=notification_container]')
     content = $('[data-behavior~=notification_content]')
@@ -1179,6 +1185,9 @@ $.extend feedbin,
     title = $('.entry-header h1').first().text()
     $('[data-behavior~=share_form] .title-placeholder').val(title)
 
+    feedId = feedbin.selectedEntryData.feed_id
+    $('[data-behavior~=share_form] input[name=feed_id]').val(feedId)
+
     url = $('#source_link').attr('href')
     $('[data-behavior~=share_form] .url-placeholder').val(url)
 
@@ -1225,13 +1234,16 @@ $.extend feedbin,
     ), timeout
 
     $('body').removeClass('has-entry-basement')
+    $('body').removeClass('has-entry-basement-share')
+    $('body').removeClass('has-entry-basement-mute')
     $('.entry-basement').removeClass('foreground')
     $('.entry-content').each ->
       @.style.removeProperty("top")
 
     clearTimeout(feedbin.openEntryBasementTimeount)
 
-  openEntryBasement: (selectedPanel) ->
+  openEntryBasement: (selectedPanel, panelName) ->
+
     feedbin.openEntryBasementTimeount = setTimeout ( ->
       $('.entry-basement').addClass('foreground')
       $('.field-cluster input, .field-cluster textarea', selectedPanel).first().select()
@@ -1248,7 +1260,14 @@ $.extend feedbin,
     $('.entry-content').css
       "top": "#{newTop}px"
     selectedPanel.prop('scrollTop', 0)
+
     $('body').addClass('has-entry-basement')
+
+    openClass = "has-entry-basement-share"
+    if panelName == "mute_panel"
+      openClass = "has-entry-basement-mute"
+    $('body').addClass(openClass)
+
     window.dispatchEvent(new CustomEvent("open-entry-basement"))
 
   applyStarred: (entryId) ->
@@ -2095,12 +2114,12 @@ $.extend feedbin,
           if selectedPanel.hasClass('hide')
             # There is another panel open, transition to the clicked on panel
             feedbin.closeEntryBasement()
-            feedbin.openEntryBasement(selectedPanel)
+            feedbin.openEntryBasement(selectedPanel, panelName)
           else
             # The clicked on panel is alread open, close it
             feedbin.closeEntryBasement()
         else
-          feedbin.openEntryBasement(selectedPanel)
+          feedbin.openEntryBasement(selectedPanel, panelName)
 
         event.preventDefault()
         return
@@ -2110,8 +2129,9 @@ $.extend feedbin,
         event.preventDefault()
         return
 
-      $(document).on 'submit', '[data-behavior~=share_form] form', (event, xhr) ->
-        feedbin.closeEntryBasement()
+      $(document).on 'submit', '[data-behavior~=share_form] form', (event) ->
+        if event.originalEvent.submitter.getAttribute("name") != "preview"
+          feedbin.closeEntryBasement()
         return
 
     supportedSharing: ->
@@ -2396,12 +2416,6 @@ $.extend feedbin,
       $(document).on 'click', '[data-behavior~=selected_category]', (event) ->
         $(@).find('[data-behavior~=categories]').toggleClass('hide')
 
-    settingsCheckbox: ->
-      callback = (event) ->
-        $(@).parents("form").submit()
-
-      $(document).on 'change', '[data-behavior~=auto_submit]', callback
-
     toggleContent: ->
       $(document).on 'click', '[data-behavior~=toggle_content_button]', (event) ->
         $(@).parents("form").submit()
@@ -2483,12 +2497,13 @@ $.extend feedbin,
         event.preventDefault()
 
     autoSubmit: ->
-      throttled = _.throttle((item)->
-        item.closest('form').submit();
-      400);
+      callback = (event) ->
+        $(@).parents("form").submit()
 
-      $(document).on 'input', '[data-behavior~=autosubmit]', (event) ->
-        throttled($(@))
+      throttled = _.throttle(callback, 400);
+
+      $(document).on 'input', '[data-behavior~=auto_submit]', callback
+      $(document).on 'input', '[data-behavior~=auto_submit_throttled]', throttled
 
     loadIframe: ->
       $(document).on 'click', '[data-behavior~=iframe_placeholder]', (event) ->
@@ -2735,6 +2750,11 @@ $.extend feedbin,
       $(document).on 'click', '[data-open-dialog]', (event) ->
         id = $(@).data('open-dialog')
         feedbin.showDialog(id)
+
+    newMuteDialog: ->
+      $(window).on 'dialog:show', (event) ->
+        if event?.detail?.id == "dialog_new_mute"
+          $('[data-behavior~=new_mute_feed_id]').val(feedbin.selectedEntryData.feed_id)
 
     delegateAjax: ->
       # forward jquery ajax events to dom events for stimulus

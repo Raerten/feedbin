@@ -1763,7 +1763,7 @@ li.selected > a .favicon-wrap,
     transform: translateY($search-height * 2);
     padding-bottom: $search-height * 2;
   }
-  ul {
+  .entries-target {
     margin: 0;
     padding: 0 0 17px 0;
     list-style: none;
@@ -2287,66 +2287,6 @@ $feed-title-width: 115px;
   max-height: calc(100vh - var(--toolbar-height));
   overflow-y: scroll;
   @include background-color($color-base);
-}
-
-.basement-toolbar {
-  height: 49px;
-  width: 100%;
-  @include background-color($color-contrast-100);
-  @include arrow(
-    $x-position: 62px,
-    $y-position: -1px,
-    $arrow-color: $color-base,
-    $shadow-color: $color-arrow-shadow,
-    $origin: right
-  ) {
-    z-index: 10;
-    visibility: hidden;
-  }
-  .one-up & {
-    @include border-bottom($color-borders-alt, $root: true);
-  }
-  .entry-basement.open &:after,
-  .entry-basement.open &:before {
-    visibility: visible;
-  }
-  &.feed-settings {
-    display: flex;
-    align-items: stretch;
-    .toolbar-item {
-      display: flex;
-      align-items: center;
-      text-align: center;
-      justify-content: center;
-      min-width: 50px;
-      @include border-right($color-borders);
-      padding: 0 8px;
-      &:hover {
-        text-decoration: none;
-      }
-      &.icon {
-        padding: 0;
-      }
-    }
-    input[type="text"] {
-      margin: 0;
-    }
-    $base-position: 17px;
-    &:before {
-      left: $base-position;
-      right: auto;
-    }
-    &:after {
-      left: $base-position + 1;
-      right: auto;
-    }
-  }
-  .touch.has-offscreen-panels & {
-    &:before,
-    &:after {
-      display: none;
-    }
-  }
 }
 
 .format-wrap {
@@ -2902,7 +2842,7 @@ $feed-title-width: 115px;
       }
     }
   }
-  .button-toggle-share-menu {
+  .button-toggle-share-menu, .mute-filter-button {
     position: relative;
     @include arrow(
       $x-position:16px,
@@ -2930,7 +2870,14 @@ $feed-title-width: 115px;
    fill: $color-accent-green-600 !important;
 }
 
-.has-entry-basement .button-toggle-share-menu {
+.has-entry-basement-share .button-toggle-share-menu {
+  &:after,
+  &:before {
+    visibility: visible !important;
+  }
+}
+
+.has-entry-basement-mute .mute-filter-button {
   &:after,
   &:before {
     visibility: visible !important;
@@ -3037,7 +2984,7 @@ $feed-title-width: 115px;
         .menu-text {
           display: flex;
           flex-direction: column;
-          line-height: 1.25;
+          line-height: 1;
           .title {
             @include font-size(14);
           }
@@ -3048,7 +2995,6 @@ $feed-title-width: 115px;
         }
         .icon-wrap {
           width: 16px;
-          height: 17px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -3056,6 +3002,8 @@ $feed-title-width: 115px;
           margin-right: base-units(1);
           svg {
             @include fill($color-icons);
+            max-width: 16px;
+            max-height: 16px;
           }
         }
         &:hover {
@@ -4590,6 +4538,9 @@ dialog {
   .twitter-conversation-link {
     display: none;
   }
+  .context-menu {
+    display: none;
+  }
   .tweet-body {
     padding-left: 57px;
     @media (max-width: $small-breakpoint) {
@@ -4889,7 +4840,6 @@ Settings
   }
   .icon-wrap {
     width: 16px;
-    height: 17px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -4908,6 +4858,7 @@ Settings
     text-align: left;
     padding: base-units(1);
     border-radius: 4px;
+    align-items: center;
     @include color($color-contrast-700);
     &:hover {
       text-decoration: none;
@@ -6592,14 +6543,6 @@ Media Queries
   .entries ul li:hover.starred .icon-star {
     display: block !important;
   }
-  .basement-toolbar {
-    &:before {
-      right: 19px;
-    }
-    &:after {
-      right: 20px;
-    }
-  }
   .share-form {
     &:before {
       right: 196px;
@@ -7021,3 +6964,6 @@ $tooltip-arrow-height: 6px;
   margin-left: base-units(1);
 }
 
+.mute-filter-available-true .article-context-menu {
+  display: block !important;
+}
