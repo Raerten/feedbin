@@ -1,7 +1,7 @@
 module Settings
   module Subscriptions
     module Shared
-      class Subscription < ApplicationComponent
+      class Subscription < ApplicationView
 
         def initialize(subscription:)
           @subscription = subscription

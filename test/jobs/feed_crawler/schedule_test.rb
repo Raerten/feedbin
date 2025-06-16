@@ -1,7 +1,7 @@
 require "test_helper"
 
 module FeedCrawler
-  class ScheduleBatchTest < ActiveSupport::TestCase
+  class ScheduleTest < ActiveSupport::TestCase
 
     setup do
       flush_redis
@@ -14,12 +14,7 @@ module FeedCrawler
 
     test "should enqueue feed_downloader jobs" do
       assert_difference -> { Downloader.jobs.size }, Feed.count do
-        ScheduleBatch.new.tap do |job|
-          def job.build_ids(*args)
-            Feed.all.map(&:id)
-          end
-          job.perform(1, false)
-        end
+        Schedule.new.perform
         Downloader.jobs.each do |job|
           feed = Feed.find(job["args"][0])
           assert_equal(feed.feed_url, job["args"][1])
@@ -30,58 +25,64 @@ module FeedCrawler
     end
 
     test "skips enqueue for throttled feed" do
-      ENV["THROTTLED_HOSTS"] = URI.parse(@feed.feed_url).host
+      hosts = Feed.all.pluck(:host)
+      ENV["THROTTLED_HOSTS"] = hosts.map {"#{it}=1"}.join(" ")
 
-      @feed.crawl_data.log_download
-      @feed.save!
+      Feed.all.each do |feed|
+        response = OpenStruct.new(etag: "1", last_modified: "2", download_fingerprint: "3", url: feed.feed_url)
+        feed.crawl_data.save(response)
+        feed.save!
+      end
 
       assert_no_difference -> { Downloader.jobs.size } do
-        ScheduleBatch.new.perform(batch, false)
+        Schedule.new.perform
       end
 
       travel (Throttle::TIMEOUT * 2).seconds do
-        assert_difference -> { Downloader.jobs.size }, +1 do
-          ScheduleBatch.new.perform(batch, false)
+        assert_difference -> { Downloader.jobs.size }, Feed.count do
+          Schedule.new.perform
         end
       end
     end
 
     test "skips enqueue for feeds with errors" do
-      @feed.crawl_data.download_error(Exception.new)
-      @feed.save!
-
-      assert_no_difference -> { Downloader.jobs.size } do
-        ScheduleBatch.new.perform(batch, false)
+      Feed.all.each do |feed|
+        feed.crawl_data.download_error(Exception.new)
+        feed.save!
       end
 
-      @feed.crawl_data.clear!
-      @feed.save!
 
-      assert_difference -> { Downloader.jobs.size }, +1 do
-        ScheduleBatch.new.perform(batch, false)
+      assert_no_difference -> { Downloader.jobs.size } do
+        Schedule.new.perform
+      end
+
+      Feed.all.each do |feed|
+        feed.crawl_data.clear!
+        feed.save!
+      end
+      flush_redis
+
+      assert_difference -> { Downloader.jobs.size }, +Feed.count do
+        Schedule.new.perform
       end
 
     end
 
     test "enqueue for feeds with errors after backoff" do
-      @feed.crawl_data.download_error(Exception.new)
-      @feed.save!
+      Feed.all.each do |feed|
+        feed.crawl_data.download_error(Exception.new)
+        feed.save!
+      end
 
       assert_no_difference -> { Downloader.jobs.size } do
-        ScheduleBatch.new.perform(batch, false)
+        Schedule.new.perform
       end
 
       travel 2.hours do
-        assert_difference -> { Downloader.jobs.size }, +1 do
-          ScheduleBatch.new.perform(batch, false)
+        assert_difference -> { Downloader.jobs.size }, Feed.count do
+          Schedule.new.perform
         end
       end
-    end
-
-    private
-
-    def batch
-      (@feed.id + SidekiqHelper::BATCH_SIZE / 2) / SidekiqHelper::BATCH_SIZE
     end
   end
 end
