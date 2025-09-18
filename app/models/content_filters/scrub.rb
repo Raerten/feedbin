@@ -21,7 +21,7 @@ module ContentFilters
         if DASHED_ELEMENT_PARENTS.include?(node.name)
           Loofah::Scrubber::STOP
         elsif node.name.include?("-")
-          node.name = "div"
+          node.name = "span"
         end
       end
     end

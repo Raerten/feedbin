@@ -736,6 +736,12 @@ $.extend feedbin,
         else
           src = 'canonical-poster'
         $(@).attr("poster", $(@).data(src))
+      content.find("img[data-camo-srcset][data-canonical-srcset]").each ->
+        if feedbin.data.proxy_images
+          src = 'camo-srcset'
+        else
+          src = 'canonical-srcset'
+        $(@).attr("srcset", $(@).data(src))
       content.find("img[data-camo-src][data-canonical-src]").each ->
         if feedbin.data.proxy_images
           src = 'camo-src'
@@ -899,8 +905,9 @@ $.extend feedbin,
 
   fullWidthImage: (img) ->
     load = ->
+      containerWidth = img.closest($('.entry-content')).width()
       width = img.get(0).naturalWidth
-      if width > 528 && img.parents(".system-content").length == 0 && img.parents("table").length == 0  && img.parents("blockquote").length == 0  && img.parents("table").length == 0  && img.parents("li").length == 0
+      if width >= containerWidth && img.parents(".system-content").length == 0 && img.parents("table").length == 0  && img.parents("blockquote").length == 0  && img.parents("table").length == 0  && img.parents("li").length == 0
         img.addClass("full-width")
       img.addClass("show")
 
@@ -923,6 +930,17 @@ $.extend feedbin,
       if actualSrc?
         video.attr("poster", actualSrc)
 
+    $("[data-camo-srcset]", context).each ->
+      img = $(@)
+
+      srcset = if feedbin.data.proxy_images
+        'camo-srcset'
+      else
+        'canonical-srcset'
+
+      actualSrcset = img.data(srcset)
+      if actualSrcset?
+        img.attr("srcset", actualSrcset)
 
     $("img[data-camo-src]", context).each ->
       img = $(@)
@@ -2324,6 +2342,11 @@ $.extend feedbin,
       $(document).on 'keyup', '[data-behavior~=feed_search]', ->
         suggestions = []
         query = $(@).val()
+
+        $.each feeds, (i, feed) ->
+          feed.classList.remove("visually-hidden")
+          feed.classList.add("border-t")
+
         if query.length < 1
           suggestions = feeds
         else
@@ -2332,9 +2355,14 @@ $.extend feedbin,
             if feed && sortName && query && typeof(query) == "string" && typeof(sortName) == "string"
               feed.score = sortName.score(query)
             else
-              feed.score = 0
-            if feed.score > 0
-              suggestions.push(feed);
+              feed.score = 1
+
+            if feed.score == 0
+              feed.classList.add("visually-hidden")
+              feed.classList.remove("border-t")
+
+            suggestions.push(feed);
+
           if suggestions.length > 0
             suggestions = _.sortBy suggestions, (suggestion) ->
               -(suggestion.score)

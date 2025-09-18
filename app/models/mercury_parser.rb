@@ -1,20 +1,32 @@
 class MercuryParser
   attr_reader :url
 
-  def initialize(url, data = nil, user = ENV["EXTRACT_USER"])
+  def initialize(url, data: nil, html: nil)
     @url = url
-    @user = user
+    @html = html
     load_data(data) if data
   end
 
-  def self.parse(*args)
+  def self.parse(...)
     Librato.increment "readability.first_parse"
-    instance = new(*args)
+    instance = new(...)
+    instance.result
+    instance
+  end
+
+  def self.parse_with_html(...)
+    Librato.increment "readability.first_parse"
+    instance = new(...)
     instance.result
     instance
   end
 
   def title
+    result["title"]
+  end
+
+  # for compatibility with Entry
+  def plain_title_with_default
     result["title"]
   end
 
@@ -59,11 +71,10 @@ class MercuryParser
       digest = OpenSSL::Digest.new("sha1")
       signature = OpenSSL::HMAC.hexdigest(digest, ENV["EXTRACT_SECRET"], url)
       base64_url = Base64.urlsafe_encode64(url).delete("\n")
-      URI::HTTPS.build({
-        host: ENV["EXTRACT_HOST"],
-        path: "/parser/#{@user}/#{signature}",
-        query: "base64_url=#{base64_url}"
-      }).to_s
+      URI.parse(ENV["EXTRACT_HOST"]).tap do
+        it.path  = "/parser/#{ENV["EXTRACT_USER"]}/#{signature}"
+        it.query = "base64_url=#{base64_url}"
+      end.to_s
     end
   end
 
@@ -72,7 +83,13 @@ class MercuryParser
       response = HTTP.timeout(write: 100, connect: 60, read: 100)
         .use(:auto_inflate)
         .headers("Accept-Encoding" => "gzip")
-        .get(service_url)
+
+      response = if @html
+        response.post(service_url, json: {body: @html})
+      else
+        response.get(service_url)
+      end
+
       response.parse
     end
   end

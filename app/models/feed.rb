@@ -6,7 +6,7 @@ class Feed < ApplicationRecord
   has_many :unread_entries
   has_many :starred_entries
   has_many :feed_stats
-  has_many :discovered_feeds, foreign_key: :site_url, primary_key: :site_url
+  has_many :discovered_feeds, -> (feed) { where.not(feed_url: feed.feed_url) }, foreign_key: :site_url, primary_key: :site_url
 
   has_many :taggings
   has_many :tags, through: :taggings
@@ -114,6 +114,10 @@ class Feed < ApplicationRecord
 
   def check
     Feedkit::Request.download(feed_url)
+  end
+
+  def volume
+    FeedStat.daily_counts(feed_ids: [id])
   end
 
   def self.include_user_title

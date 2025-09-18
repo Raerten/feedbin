@@ -29,9 +29,10 @@ class IframeEmbed::Youtube < IframeEmbed
 
   def iframe_params
     {
-      "autoplay" => "1",
-      "rel" => "0",
-      "showinfo" => "0"
+      autoplay: "1",
+      rel: "0",
+      showinfo: "0",
+      enablejsapi: "1"
     }
   end
 
@@ -44,15 +45,8 @@ class IframeEmbed::Youtube < IframeEmbed
   end
 
   def duration
-    return unless seconds = video && video.duration_in_seconds
-
-    hours = seconds / (60 * 60)
-    minutes = (seconds / 60) % 60
-    seconds = seconds % 60
-
-    parts = [minutes, seconds]
-    parts.unshift(hours) unless hours == 0
-    parts.map {|part| part.to_s.rjust(2, "0") }.join(":")
+    return unless video && video.duration_in_seconds
+    video.duration_in_seconds
   end
 
   def profile_image
@@ -61,6 +55,14 @@ class IframeEmbed::Youtube < IframeEmbed
 
   def cache_key
     video && "youtube_embed_#{video.updated_at.to_i}" || super
+  end
+
+  def chapters
+    video && video.chapters
+  end
+
+  def youtube?
+    true
   end
 
   private

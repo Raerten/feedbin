@@ -31,4 +31,8 @@ class Embed < ApplicationRecord
     (((((parts["weeks"] * 7) + parts["days"]) * 24 + parts["hours"]) * 60) + parts["minutes"]) * 60 + parts["seconds"]
   end
 
+  def chapters
+    text = data.safe_dig("snippet", "description") || ""
+    @chapters ||= TextToChapters.call(text, duration_in_seconds)
+  end
 end

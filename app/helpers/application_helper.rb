@@ -51,6 +51,10 @@ module ApplicationHelper
     current_user.try(:unread_entries).try(:order, "created_at DESC").try(:first).try(:created_at).try(:iso8601, 6)
   end
 
+  def timeago_text(time_value)
+    [distance_of_time_in_words(time_value, Time.now, scope: 'datetime.distance_in_words.short'), time_value.future? ? "from now" : "ago"].join(" ")
+  end
+
   def get_icon(name)
     name = name.sub(".svg", "")
     icon = Feedbin::Application.config.icons[name]
@@ -250,5 +254,19 @@ module ApplicationHelper
 
   def xml_format(content, entry)
     raw(ContentFormatter.absolute_source(content, entry))
+  end
+
+  def seconds_to_timestamp(seconds)
+    return unless seconds
+
+    hours   = seconds / 3600
+    minutes = (seconds % 3600) / 60
+    seconds = seconds % 60
+
+    if hours > 0
+      "#{hours}:#{minutes.to_s.rjust(2, '0')}:#{seconds.to_s.rjust(2, '0')}"
+    else
+      "#{minutes}:#{seconds.to_s.rjust(2, '0')}"
+    end
   end
 end

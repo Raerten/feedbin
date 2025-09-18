@@ -129,19 +129,44 @@ module Settings
           end
         end
 
-        render Settings::ControlGroupComponent.new class: "mb-14" do |group|
+        render Settings::ControlGroupComponent.new class: "mb-14", id: "pages_options" do |group|
           group.header { "Pages" }
 
+          group.item do
+            render Settings::ControlRowComponent.new do |row|
+              row.title { "Extension" }
+
+              row.description do
+                plain "You can "
+                a(href: "/blog/2019/08/20/save-webpages-to-read-later/") do
+                  "save articles from the web"
+                end
+                plain " to read later in Feedbin. Install the Feedbin browser extension to get started. "
+              end
+
+              row.control do
+                div class: "whitespace-nowrap" do
+                  a href: "https://apps.apple.com/us/app/feedbin/id1444961766" do
+                    "Safari"
+                  end
+                  plain ", "
+                  a href: "https://addons.mozilla.org/en-US/firefox/addon/feedbin-subscribe-save/" do
+                    "Firefox"
+                  end
+                  plain ", "
+                  a href: "https://chromewebstore.google.com/detail/feedbin-subscribe-save/dokieklajbcljjhhaabkjceopenlimco" do
+                    "Chrome"
+                  end
+                end
+              end
+            end
+          end
           group.item do
             render Settings::ControlRowComponent.new do |row|
               row.title { "Bookmarklet" }
 
               row.description do
-                plain "Drag this to your bookmarks bar. Use it to "
-                a(href: "/blog/2019/08/20/save-webpages-to-read-later/") do
-                  "save articles from the web"
-                end
-                plain " to Feedbin."
+                plain "If the extension is not an option, there's also a bookmarklet. Drag this to your bookmarks bar."
               end
 
               row.control do

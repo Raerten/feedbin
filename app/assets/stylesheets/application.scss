@@ -2989,6 +2989,7 @@ $feed-title-width: 115px;
             @include font-size(14);
           }
           .subtitle {
+            margin-top: 0.25rem;
             @include font-size(12);
             @include color($color-contrast-500);
           }
@@ -2996,12 +2997,12 @@ $feed-title-width: 115px;
         .icon-wrap {
           width: 16px;
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           justify-content: center;
           flex-shrink: 0;
           margin-right: base-units(1);
           svg {
-            @include fill($color-icons);
+            @include fill($color-contrast-500);
             max-width: 16px;
             max-height: 16px;
           }
@@ -5766,10 +5767,11 @@ Print
   @page {
     margin: 1in;
   }
-  body {
-    font-family: "Mercury SSm A", "Mercury SSm B", $font-stack;
+  body, html {
     font-weight: 400;
     font-style: normal;
+    overflow: visible !important;
+    height: auto !important;
   }
   h1,
   h2,
@@ -5777,7 +5779,7 @@ Print
   h4,
   h5,
   h6 {
-    font-family: $font-stack;
+    font-family: $font-stack !important;
   }
   hr {
     background: none;
@@ -5797,14 +5799,22 @@ Print
   table {
     font-size: 12pt;
   }
+  .content-option {
+    font-family: ui-serif, Georgia, serif !important;
+  }
   .app .bar,
   .app .feeds-column,
   .app .entries-column,
-  .app .entry-toolbar {
+  .app .entry-toolbar,
+  .app .entry-meta,
+  .app .splash,
+  .app .content-option-form {
     display: none !important;
   }
   .app .content,
-  .app .entry-content {
+  .app .entry-content,
+  .app .entry-inner-column,
+  .app .inner-column {
     position: static;
   }
   .app .entry-inner {
@@ -6944,20 +6954,6 @@ $tooltip-arrow-height: 6px;
     height: 18px;
     width: 18px;
   }
-}
-
-.one-line {
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.two-lines {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .spacer {
