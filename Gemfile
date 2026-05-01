@@ -1,8 +1,14 @@
 source "https://rubygems.org"
 git_source(:github) { |name| "https://github.com/#{name}.git" }
 
-gem "rails", "7.2.3"
+# load first so environment is initialized
+gem "dotenv-rails", "= 2.8.1"
+
+gem "rails", "7.2.3.1"
 gem "will_paginate"
+
+# update once http-cookie has a release above 1.1.4
+gem "http-cookie", "= 1.1.0"
 
 gem "http",                github: "feedbin/http",                branch: "feedbin"
 gem "carrierwave",         github: "feedbin/carrierwave",         branch: "feedbin"
@@ -12,6 +18,8 @@ gem "feedkit",             github: "feedbin/feedkit",             branch: "maste
 gem "html-pipeline",       github: "feedbin/html-pipeline",       branch: "feedbin"
 gem "html_diff",           github: "feedbin/html_diff",           ref: "c1107c0"
 gem "twitter",             github: "feedbin/twitter",             branch: "feedbin"
+gem "librato-metrics",     github: "feedbin/librato-metrics",     branch: "feedbin"
+gem "librato-rails",       github: "feedbin/librato-rails",       branch: "feedbin"
 
 gem "net-protocol"
 gem "activerecord-import"
@@ -23,8 +31,7 @@ gem "bootsnap", require: false
 gem "clockwork"
 gem "coffee-rails"
 gem "concurrent-ruby"
-gem "connection_pool"
-gem "dotenv-rails", "= 2.8.1"
+gem "connection_pool", "< 3"
 gem "down"
 gem "evernote_oauth"
 gem "fog-aws"
@@ -36,7 +43,6 @@ gem "importmap-rails"
 gem "jbuilder"
 gem "jquery-rails"
 gem "jwt"
-gem "librato-rails", "~> 1.4.2"
 gem "lograge"
 gem "lookbook"
 gem "mail"
@@ -90,12 +96,12 @@ group :development, :test do
   gem "capybara", github: "teamcapybara/capybara"
   gem "debug"
   gem "faker"
-  gem "minitest"
+  gem "minitest", "< 6"
   gem "minitest-stub-const"
   gem "minitest-stub_any_instance"
   gem "puma"
   gem "rails-controller-testing"
-  gem "selenium-webdriver"
+  gem "cuprite"
   gem "standard"
   gem "webmock"
   # gem "phlex-testing-nokogiri"

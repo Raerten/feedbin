@@ -1839,6 +1839,12 @@ li.selected > a .favicon-wrap,
   }
 }
 
+.feeds, .entries, .entry-toolbar {
+  a:focus {
+    outline: 0;
+  }
+}
+
 .entry-summary-link {
   $margin: 4px;
   display: block;
